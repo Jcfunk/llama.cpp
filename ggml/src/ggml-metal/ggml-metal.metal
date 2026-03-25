@@ -668,12 +668,12 @@ void quantize_turbo4_0(device const float * src, device block_turbo4_0 & dst) {
 
         dst.qs[j / 2] |= (idx & 0xF) << ((j % 2) * 4);
         recon_norm_sq += turbo_centroids_4bit[idx] * turbo_centroids_4bit[idx];
-        }
+    }
 
     dst.rnorm = half(0.0f);
     float recon_norm = sqrt(recon_norm_sq);
     dst.norm = half((recon_norm > 1e-10f) ? grp_norm / recon_norm : grp_norm);
-    }
+}
 
 // ----- turbo3 dequantize with per-thread block cache -----
 // The rotation requires all 128 elements. Flash attention calls dequantize
@@ -738,9 +738,9 @@ void dequantize_turbo2_0(device const block_turbo2_0 * xb, short il, thread type
             turbo_centroids_2bit[(qb >> 4) & 0x03] * norm,
             turbo_centroids_2bit[(qb >> 6)       ] * norm
         );
-        }
-    reg = (type4x4) reg_f;
     }
+    reg = (type4x4) reg_f;
+}
 
 // Vec: 4 elements per call (il ∈ {0..7}), returns type4
 template <typename type4>
