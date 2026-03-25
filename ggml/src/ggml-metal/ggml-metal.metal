@@ -754,7 +754,7 @@ void dequantize_turbo2_0_t4(device const block_turbo2_0 * xb, short il, thread t
         float(turbo_centroids_2bit_h[(qb >> 4) & 0x03]) * norm,
         float(turbo_centroids_2bit_h[(qb >> 6)       ]) * norm
     ));
-    }
+}
 
 // Block-32 dequant: no WHT needed (graph handles rotation). Just centroid lookup + norm scale.
 // With QK_TURBO3=32: nl=2 for non-vec FA (32/16), nl=8 for vec FA (32/4).
