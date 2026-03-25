@@ -1330,7 +1330,7 @@ ggml_tensor * llama_kv_cache::get_k(ggml_context * ctx, int32_t il, uint32_t n_k
     if (k_is_turbo) {
         assert(n_embd_k_gqa >= hparams.n_embd_k_gqa(il));
     } else {
-        assert(n_embd_k_gqa == hparams.n_embd_k_gqa(il));
+    assert(n_embd_k_gqa == hparams.n_embd_k_gqa(il));
     }
 
     // Use padded head_dim for turbo types so the full padded data is returned
@@ -1372,8 +1372,8 @@ ggml_tensor * llama_kv_cache::get_v(ggml_context * ctx, int32_t il, uint32_t n_k
         return ggml_view_4d(ctx, v,
                 head_v_eff, hparams.n_head_kv(il), n_kv, ns,
                 ggml_row_size(v->type, head_v_eff),                      // v->nb[1]
-                ggml_row_size(v->type, n_embd_v_gqa),                    // v->nb[2]
-                ggml_row_size(v->type, n_embd_v_gqa*kv_size),            // v->nb[3]
+                ggml_row_size(v->type, n_embd_v_gqa),                   // v->nb[2]
+                ggml_row_size(v->type, n_embd_v_gqa*kv_size),           // v->nb[3]
                 ggml_row_size(v->type, n_embd_v_gqa*kv_size)*sinfo.s0);
     }
 
@@ -1381,8 +1381,8 @@ ggml_tensor * llama_kv_cache::get_v(ggml_context * ctx, int32_t il, uint32_t n_k
     return ggml_view_4d(ctx, v,
             n_kv, hparams.n_head_kv(il), head_v_eff, ns,
             ggml_row_size(v->type, kv_size*head_v_eff),              // v->nb[1]
-            ggml_row_size(v->type, kv_size),                         // v->nb[2]
-            ggml_row_size(v->type, kv_size*n_embd_v_gqa),            // v->nb[3]
+            ggml_row_size(v->type, kv_size),                        // v->nb[2]
+            ggml_row_size(v->type, kv_size*n_embd_v_gqa),           // v->nb[3]
             ggml_row_size(v->type, kv_size*n_embd_v_gqa)*sinfo.s0);
 }
 

@@ -68,7 +68,7 @@ static ggml_tensor * ggml_mul_mat_aux(
     if (!ggml_is_contiguous(cur)) {
         res = ggml_cont_2d   (ctx, cur, n, ggml_nelements(cur)/n);
     } else {
-        res = ggml_reshape_2d(ctx, cur, n, ggml_nelements(cur)/n);
+    res = ggml_reshape_2d(ctx, cur, n, ggml_nelements(cur)/n);
     }
     res = ggml_mul_mat   (ctx, rot, res);
     ggml_mul_mat_set_hint(res, GGML_HINT_SRC0_IS_HADAMARD);
