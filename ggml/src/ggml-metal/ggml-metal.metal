@@ -549,7 +549,7 @@ static void turbo_rotate_forward(thread float * x, constant float * s1, constant
     for (int i = 0; i < 128; i++) x[i] *= s1[i];
     turbo_fwht_128(x);
     for (int i = 0; i < 128; i++) x[i] *= s2[i];
-}
+    }
 
 // --- Inverse rotation: signs2 → FWHT → signs1 (FWHT is its own inverse) ---
 static void turbo_rotate_inverse(thread float * x, constant float * s1, constant float * s2) {
