@@ -632,8 +632,8 @@ void quantize_turbo2_0(device const float * src, device block_turbo2_0 & dst) {
         else                              idx = 3;
 
         dst.qs[j / 4] |= (idx & 0x3) << ((j % 4) * 2);
+        }
     }
-}
 
 // Quantize 32 elements into one block_turbo3_0 (NO rotation — rotation happens
 // at the 128-element group level in kernel_set_rows_turbo)
@@ -711,7 +711,7 @@ void quantize_turbo4_0(device const float * src, device block_turbo4_0 & dst) {
     dst.rnorm = half(0.0f);
     float recon_norm = sqrt(recon_norm_sq);
     dst.norm = half((recon_norm > 1e-10f) ? grp_norm / recon_norm : grp_norm);
-}
+    }
 
 // ----- turbo3 dequantize with per-thread block cache -----
 // The rotation requires all 128 elements. Flash attention calls dequantize
@@ -763,7 +763,7 @@ static void turbo_fwht_128_half4(thread half4 * v) {
 // Non-vec: 16 elements per call (il ∈ {0,1}), returns type4x4
 template <typename type4x4>
 void dequantize_turbo2_0(device const block_turbo2_0 * xb, short il, thread type4x4 & reg) {
-    const float norm = float(xb->norm);
+    const float norm  = float(xb->norm);
     // il=0 → elements 0-15 (qs bytes 0-3)
     // il=1 → elements 16-31 (qs bytes 4-7)
     const int qs_off = il * 4;
@@ -870,7 +870,7 @@ void dequantize_turbo3_0_t4(device const block_turbo3_0 * xb, short il, thread t
     reg = type4(0.0f);
 #elif TURBO_PROFILE_MODE == 2
     // NORM ONLY: just read norm, return it as all 4 values
-    const float norm = float(xb->norm);
+    const float norm  = float(xb->norm);
     reg = type4(norm);
 #elif TURBO_PROFILE_MODE == 3
     // NORM + QS: read norm and qs byte, skip signs
@@ -962,7 +962,7 @@ static void turbo4_dequantize_full_block(device const block_turbo4_0 * xb, threa
 template <typename type4x4>
 void dequantize_turbo4_0(device const block_turbo4_0 * xb, short il, thread type4x4 & reg) {
     // Direct 16-element extraction — 4-bit nibble unpack
-    const float norm = float(xb->norm);
+    const float norm  = float(xb->norm);
     const int base = il * 16;
     float4x4 reg_f;
 
@@ -980,7 +980,7 @@ template <typename type4>
 void dequantize_turbo4_0_t4(device const block_turbo4_0 * xb, short il, thread type4 & reg) {
     // Direct 16-entry half LUT — fastest on M5 Max (constant cache not the bottleneck)
     // 8-mag LUT tested: -3% on M5 due to ternary branch overhead. Keep for M1/M2 if needed.
-    const float norm = float(xb->norm);
+    const float norm  = float(xb->norm);
     const device uint8_t * qs = xb->qs + il * 2;
     const uint8_t qb0 = qs[0];
     const uint8_t qb1 = qs[1];
@@ -11497,7 +11497,7 @@ kernel void kernel_set_rows_turbo2(
 
                 float c = turbo_centroids_2bit[idx];
                 recon_norm_sq += c * c;
-            }
+    }
         }
 
         float recon_norm = sqrt(recon_norm_sq);
@@ -11531,7 +11531,7 @@ kernel void kernel_set_rows_turbo4(
     const TI      i1  = ((const device TI *) ((const device char *) src1 + i10*args.nb10 + i11*args.nb11 + i12*args.nb12))[0];
 
           device block_turbo4_0 * dst_row = (      device block_turbo4_0 *) ((      device char *) dst  +  i1*args.nb1  + i02*args.nb2  + i03*args.nb3);
-    const device float           * src_row = (const device float         *) ((const device char *) src0 + i01*args.nb01 + i02*args.nb02 + i03*args.nb03);
+    const device float   * src_row = (const device float   *) ((const device char *) src0 + i01*args.nb01 + i02*args.nb02 + i03*args.nb03);
 
     // Each block is one 128-element group (nk0 = ne0 / QK_TURBO4)
     const int n_blocks = args.nk0;
