@@ -628,8 +628,8 @@ void quantize_turbo3_0(device const float * src, device block_turbo3_0 & dst) {
         if (idx & 0x4) {
             dst.signs[j / 8] |= (1 << (j % 8));
         }
-        }
     }
+}
 
 void quantize_turbo4_0(device const float * src, device block_turbo4_0 & dst) {
 #pragma METAL fp math_mode(safe)
