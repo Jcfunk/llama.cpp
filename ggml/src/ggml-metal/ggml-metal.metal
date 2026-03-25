@@ -534,8 +534,8 @@ static void turbo_fwht_128(thread float * x) {
                 float b = x[j + h];
                 x[j]     = a + b;
                 x[j + h] = a - b;
-            }
-        }
+    }
+}
     }
     // Normalize by 1/sqrt(128)
     const float inv_sqrt_128 = 0.08838834764831845f; // 1/sqrt(128)
@@ -632,7 +632,7 @@ void quantize_turbo2_0(device const float * src, device block_turbo2_0 & dst) {
         else                              idx = 3;
 
         dst.qs[j / 4] |= (idx & 0x3) << ((j % 4) * 2);
-        }
+    }
     }
 
 // Quantize 32 elements into one block_turbo3_0 (NO rotation — rotation happens
@@ -666,8 +666,8 @@ void quantize_turbo3_0(device const float * src, device block_turbo3_0 & dst) {
         if (idx & 0x4) {
             dst.signs[j / 8] |= (1 << (j % 8));
         }
+        }
     }
-}
 
 void quantize_turbo4_0(device const float * src, device block_turbo4_0 & dst) {
 #pragma METAL fp math_mode(safe)
@@ -711,7 +711,7 @@ void quantize_turbo4_0(device const float * src, device block_turbo4_0 & dst) {
     dst.rnorm = half(0.0f);
     float recon_norm = sqrt(recon_norm_sq);
     dst.norm = half((recon_norm > 1e-10f) ? grp_norm / recon_norm : grp_norm);
-    }
+        }
 
 // ----- turbo3 dequantize with per-thread block cache -----
 // The rotation requires all 128 elements. Flash attention calls dequantize
@@ -778,7 +778,7 @@ void dequantize_turbo2_0(device const block_turbo2_0 * xb, short il, thread type
         );
     }
     reg = (type4x4) reg_f;
-}
+    }
 
 // Vec: 4 elements per call (il ∈ {0..7}), returns type4
 template <typename type4>
@@ -792,7 +792,7 @@ void dequantize_turbo2_0_t4(device const block_turbo2_0 * xb, short il, thread t
         float(turbo_centroids_2bit_h[(qb >> 4) & 0x03]) * norm,
         float(turbo_centroids_2bit_h[(qb >> 6)       ]) * norm
     ));
-}
+    }
 
 // Block-32 dequant: no WHT needed (graph handles rotation). Just centroid lookup + norm scale.
 // With QK_TURBO3=32: nl=2 for non-vec FA (32/16), nl=8 for vec FA (32/4).
@@ -950,14 +950,14 @@ void dequantize_turbo3_0_t4(device const block_turbo3_0 * xb, short il, thread t
 // ----- turbo4 dequantize with per-thread block cache -----
 
 static void turbo4_dequantize_full_block(device const block_turbo4_0 * xb, thread float * cache) {
-    const float norm = float(xb->norm);
+    const float norm  = float(xb->norm);
 
     // 4-bit nibble unpack — 2 elements per byte, simple and fast
     for (int j = 0; j < 128; j++) {
         uint8_t idx = (xb->qs[j / 2] >> ((j % 2) * 4)) & 0xF;
         cache[j] = turbo_centroids_4bit[idx] * norm;
+        }
     }
-}
 
 template <typename type4x4>
 void dequantize_turbo4_0(device const block_turbo4_0 * xb, short il, thread type4x4 & reg) {
@@ -971,7 +971,7 @@ void dequantize_turbo4_0(device const block_turbo4_0 * xb, short il, thread type
             const int j = base + g * 4 + k;
             uint8_t idx = (xb->qs[j / 2] >> ((j % 2) * 4)) & 0xF;
             reg_f[g][k] = turbo_centroids_4bit[idx] * norm;
-        }
+    }
     }
     reg = (type4x4) reg_f;
 }
