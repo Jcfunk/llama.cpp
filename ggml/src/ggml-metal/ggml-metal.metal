@@ -691,12 +691,12 @@ static void turbo_fwht_128_half4(thread half4 * v) {
     for (int i = 0; i < 32; i++) {
         half4 a = v[i];
         v[i] = half4(a.x + a.y, a.x - a.y, a.z + a.w, a.z - a.w);
-    }
+            }
     // Stage h=2: butterfly between elements 0,2 and 1,3 within each half4
     for (int i = 0; i < 32; i++) {
         half4 a = v[i];
         v[i] = half4(a.x + a.z, a.y + a.w, a.x - a.z, a.y - a.w);
-    }
+        }
     // Stages h=4,8,16,32,64: butterfly between half4 vectors
     for (int h = 4; h < 128; h *= 2) {
         int vec_stride = h / 4;  // distance in half4 units
@@ -708,7 +708,7 @@ static void turbo_fwht_128_half4(thread half4 * v) {
                 half4 b = v[partner];
                 v[i]       = a + b;
                 v[partner] = a - b;
-            }
+    }
         }
     }
     // Normalize
@@ -716,7 +716,7 @@ static void turbo_fwht_128_half4(thread half4 * v) {
     for (int i = 0; i < 32; i++) {
         v[i] *= inv_sqrt_128;
     }
-    }
+}
 
 // ----- turbo2 dequantize -----
 // 2-bit indices (4 centroids), no signs byte. Simpler than turbo3.
@@ -725,7 +725,7 @@ static void turbo_fwht_128_half4(thread half4 * v) {
 // Non-vec: 16 elements per call (il ∈ {0,1}), returns type4x4
 template <typename type4x4>
 void dequantize_turbo2_0(device const block_turbo2_0 * xb, short il, thread type4x4 & reg) {
-    const float norm  = float(xb->norm);
+    const float norm = float(xb->norm);
     // il=0 → elements 0-15 (qs bytes 0-3)
     // il=1 → elements 16-31 (qs bytes 4-7)
     const int qs_off = il * 4;
@@ -754,7 +754,7 @@ void dequantize_turbo2_0_t4(device const block_turbo2_0 * xb, short il, thread t
         float(turbo_centroids_2bit_h[(qb >> 4) & 0x03]) * norm,
         float(turbo_centroids_2bit_h[(qb >> 6)       ]) * norm
     ));
-}
+    }
 
 // Block-32 dequant: no WHT needed (graph handles rotation). Just centroid lookup + norm scale.
 // With QK_TURBO3=32: nl=2 for non-vec FA (32/16), nl=8 for vec FA (32/4).
