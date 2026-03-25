@@ -691,12 +691,12 @@ static void turbo_fwht_128_half4(thread half4 * v) {
     for (int i = 0; i < 32; i++) {
         half4 a = v[i];
         v[i] = half4(a.x + a.y, a.x - a.y, a.z + a.w, a.z - a.w);
-            }
+    }
     // Stage h=2: butterfly between elements 0,2 and 1,3 within each half4
     for (int i = 0; i < 32; i++) {
         half4 a = v[i];
         v[i] = half4(a.x + a.z, a.y + a.w, a.x - a.z, a.y - a.w);
-        }
+    }
     // Stages h=4,8,16,32,64: butterfly between half4 vectors
     for (int h = 4; h < 128; h *= 2) {
         int vec_stride = h / 4;  // distance in half4 units
@@ -708,7 +708,7 @@ static void turbo_fwht_128_half4(thread half4 * v) {
                 half4 b = v[partner];
                 v[i]       = a + b;
                 v[partner] = a - b;
-    }
+            }
         }
     }
     // Normalize
@@ -738,9 +738,9 @@ void dequantize_turbo2_0(device const block_turbo2_0 * xb, short il, thread type
             turbo_centroids_2bit[(qb >> 4) & 0x03] * norm,
             turbo_centroids_2bit[(qb >> 6)       ] * norm
         );
-    }
+        }
     reg = (type4x4) reg_f;
-}
+    }
 
 // Vec: 4 elements per call (il ∈ {0..7}), returns type4
 template <typename type4>
