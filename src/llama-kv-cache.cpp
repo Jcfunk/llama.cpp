@@ -256,7 +256,7 @@ llama_kv_cache::llama_kv_cache(
                     int mode = atoi(env);
                     if (mode > 0) {
                         LLAMA_LOG_INFO("llama_kv_cache: layer-adaptive mode %d enabled (env)\n", mode);
-                    }
+                }
                     return mode;
                 }
                 // Auto-enable Boundary V (mode 7) when V is turbo2
@@ -285,13 +285,13 @@ llama_kv_cache::llama_kv_cache(
                 layer_type_v = is_boundary ? GGML_TYPE_TURBO4_0 : GGML_TYPE_TURBO2_0;
                 if (il == 0) {
                     LLAMA_LOG_INFO("llama_kv_cache: Boundary V mode 5: first2+last2 V=turbo4, rest V=turbo2\n");
-                }
+            }
             } else if (adaptive_mode == 6 && v_is_turbo && n_layer >= 8) {
                 // V-only: last 8 V=turbo4, rest V=turbo2
                 layer_type_v = (il >= n_layer - 8) ? GGML_TYPE_TURBO4_0 : GGML_TYPE_TURBO2_0;
                 if (il == 0) {
                     LLAMA_LOG_INFO("llama_kv_cache: V-only LA mode 6: last8 V=turbo4, rest V=turbo2\n");
-                }
+        }
             } else if (adaptive_mode == 7 && v_is_turbo && n_layer >= 8) {
                 // Boundary V (recommended): first2+last2 V=q8_0, rest V=turbo2
                 const bool is_boundary = (il < 2 || il >= n_layer - 2);
