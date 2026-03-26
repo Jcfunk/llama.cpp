@@ -254,10 +254,10 @@ llama_kv_cache::llama_kv_cache(
                 const char * env = getenv("TURBO_LAYER_ADAPTIVE");
                 if (env) {
                     int mode = atoi(env);
-                    if (mode > 0) {
+                if (mode > 0) {
                         LLAMA_LOG_INFO("llama_kv_cache: layer-adaptive mode %d enabled (env)\n", mode);
                 }
-                    return mode;
+                return mode;
                 }
                 // Auto-enable Boundary V (mode 7) when V is turbo2
                 if (type_v == GGML_TYPE_TURBO2_0 && hparams.n_layer >= 8) {
