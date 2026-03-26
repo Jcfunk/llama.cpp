@@ -799,7 +799,7 @@ constant half turbo_centroids_3bit_h[8] = {
 // 4-entry magnitude LUT (positive values only, ascending order)
 // Used with ALU sign application to halve constant cache divergence
 constant half turbo_mag_3bit_h[4] = {
-    0.021460h, 0.065717h, 0.117832h, 0.190685h
+     0.021460h,  0.065717h,  0.117832h,  0.190685h
 };
 
 // 2-entry PAIR LUT: each entry is a half2 containing two adjacent magnitudes.
