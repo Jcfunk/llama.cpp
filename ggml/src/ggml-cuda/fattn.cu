@@ -475,8 +475,8 @@ static best_fattn_kernel ggml_cuda_get_best_fattn_kernel(const int device, const
                 || t == GGML_TYPE_Q8_0 || t == GGML_TYPE_F16 || t == GGML_TYPE_BF16;
         };
         if (!is_kv_compat(K->type) || !is_kv_compat(V->type)) {
-            return BEST_FATTN_KERNEL_NONE;
-        }
+        return BEST_FATTN_KERNEL_NONE;
+    }
     }
 #endif // GGML_CUDA_FA_ALL_QUANTS
 
