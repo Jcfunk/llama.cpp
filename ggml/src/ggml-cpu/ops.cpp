@@ -3773,7 +3773,7 @@ static void ggml_compute_forward_rms_norm_f32(
                     sum += (ggml_float)(x[i00] * x[i00]);
                 }
 
-                const float mean  = sum/ne00;
+                const float mean = sum/ne00;
                 const float scale = 1.0f/sqrtf(mean + eps);
 
                 // if you hit this, likely you got an inf somewhere earlier
@@ -3792,11 +3792,11 @@ static void ggml_compute_forward_rms_norm_f32(
                     }
                 } else {
                     memcpy(y, x, ne00 * sizeof(float));
-                    ggml_vec_scale_f32(ne00, y, scale);
-                }
+                ggml_vec_scale_f32(ne00, y, scale);
             }
         }
     }
+}
 }
 
 void ggml_compute_forward_rms_norm(
