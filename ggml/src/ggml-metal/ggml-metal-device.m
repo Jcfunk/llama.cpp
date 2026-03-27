@@ -236,7 +236,7 @@ ggml_metal_library_t ggml_metal_library_init(ggml_metal_device_t dev) {
                     // Pre-M5: always 4-mag (constant cache too slow)
                     // M5+: 4-mag for mid-context (8K-20K), 8-LUT otherwise
                     if (!ggml_metal_device_get_props(dev)->has_tensor || (force_4mag && force_4mag[0] == '1')) {
-                    [prep setObject:@"1" forKey:@"TURBO_USE_4MAG"];
+                        [prep setObject:@"1" forKey:@"TURBO_USE_4MAG"];
                         GGML_LOG_INFO("%s: turbo3 using 4-mag LUT%s\n", __func__,
                             force_4mag ? " (forced)" : " (pre-M5 hardware)");
                     }
