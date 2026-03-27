@@ -745,8 +745,8 @@ template <typename T, int ne>
 static __device__ __forceinline__ void dequantize_V_turbo3_0(const void * __restrict__ vx, void * __restrict__ dst, const int64_t i0) {
     const block_turbo3_0 * x = (const block_turbo3_0 *) vx;
 
-    const int64_t ib   = i0 / QK_TURBO3;
-    const int     j0   = i0 % QK_TURBO3;
+    const int64_t ib  = i0 / QK_TURBO3;
+    const int     j0  = i0 % QK_TURBO3;
     const float   norm = __half2float(x[ib].norm);
 
     static_assert(ne == 2 || ne == 4, "bad ne");
@@ -764,7 +764,7 @@ static __device__ __forceinline__ void dequantize_V_turbo3_0(const void * __rest
         const uint8_t idx3 = ((qs_byte >> 6) & 0x3) | (((sgn_byte >> (shift_s+3)) & 0x1) << 2);
 
 #ifdef FP16_AVAILABLE
-        if constexpr (std::is_same_v<T, half>) {
+    if constexpr (std::is_same_v<T, half>) {
             ((half2 *) dst)[0] = make_half2(
                 __float2half(TURBO_CENTROIDS_3BIT[idx0] * norm),
                 __float2half(TURBO_CENTROIDS_3BIT[idx1] * norm));
@@ -789,9 +789,9 @@ static __device__ __forceinline__ void dequantize_V_turbo3_0(const void * __rest
             float v0 = turbo3_dequant_element(&x[ib], j0,   norm);
             float v1 = turbo3_dequant_element(&x[ib], j0+1, norm);
             ((half2 *) dst)[0] = make_half2(__float2half(v0), __float2half(v1));
-        } else
+    } else
 #endif // FP16_AVAILABLE
-        if constexpr (std::is_same_v<T, float>) {
+    if constexpr (std::is_same_v<T, float>) {
             ((float *) dst)[0] = turbo3_dequant_element(&x[ib], j0,   norm);
             ((float *) dst)[1] = turbo3_dequant_element(&x[ib], j0+1, norm);
         } else {
