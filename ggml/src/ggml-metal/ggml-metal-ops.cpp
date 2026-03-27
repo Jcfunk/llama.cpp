@@ -2291,35 +2291,35 @@ int ggml_metal_op_mul_mat(ggml_metal_op_t ctx, int idx) {
             ggml_metal_op_concurrency_reset(ctx);
         } else {
             // Non-TQ weight or unaligned: use standard mul_mm path
-            auto pipeline = ggml_metal_library_get_pipeline_mul_mm(lib, op);
+        auto pipeline = ggml_metal_library_get_pipeline_mul_mm(lib, op);
 
-            ggml_metal_kargs_mul_mm args = {
-                /*.ne00 =*/ ne00,
-                /*.ne02 =*/ ne02,
-                /*.nb01 =*/ nb01,
-                /*.nb02 =*/ nb02,
-                /*.nb03 =*/ nb03,
-                /*.ne12 =*/ ne12,
-                /*.nb10 =*/ nb10,
-                /*.nb11 =*/ nb11,
-                /*.nb12 =*/ nb12,
-                /*.nb13 =*/ nb13,
-                /*.ne0  =*/ ne0,
-                /*.ne1  =*/ ne1,
-                /*.r2   =*/ r2,
-                /*.r3   =*/ r3,
-            };
+        ggml_metal_kargs_mul_mm args = {
+            /*.ne00 =*/ ne00,
+            /*.ne02 =*/ ne02,
+            /*.nb01 =*/ nb01,
+            /*.nb02 =*/ nb02,
+            /*.nb03 =*/ nb03,
+            /*.ne12 =*/ ne12,
+            /*.nb10 =*/ nb10,
+            /*.nb11 =*/ nb11,
+            /*.nb12 =*/ nb12,
+            /*.nb13 =*/ nb13,
+            /*.ne0  =*/ ne0,
+            /*.ne1  =*/ ne1,
+            /*.r2   =*/ r2,
+            /*.r3   =*/ r3,
+        };
 
-            ggml_metal_encoder_set_pipeline(enc, pipeline);
-            ggml_metal_encoder_set_bytes   (enc, &args, sizeof(args), 0);
-            ggml_metal_encoder_set_buffer  (enc, ggml_metal_get_buffer_id(op->src[0]), 1);
-            ggml_metal_encoder_set_buffer  (enc, ggml_metal_get_buffer_id(op->src[1]), 2);
-            ggml_metal_encoder_set_buffer  (enc, ggml_metal_get_buffer_id(op),         3);
+        ggml_metal_encoder_set_pipeline(enc, pipeline);
+        ggml_metal_encoder_set_bytes   (enc, &args, sizeof(args), 0);
+        ggml_metal_encoder_set_buffer  (enc, ggml_metal_get_buffer_id(op->src[0]), 1);
+        ggml_metal_encoder_set_buffer  (enc, ggml_metal_get_buffer_id(op->src[1]), 2);
+        ggml_metal_encoder_set_buffer  (enc, ggml_metal_get_buffer_id(op),         3);
 
-            const size_t smem = pipeline.smem;
+        const size_t smem = pipeline.smem;
 
-            ggml_metal_encoder_set_threadgroup_memory_size(enc, smem, 0);
-            ggml_metal_encoder_dispatch_threadgroups(enc, ((ne11 + 31)/32), ((ne01 + 63)/64), ne12*ne13, 128, 1, 1);
+        ggml_metal_encoder_set_threadgroup_memory_size(enc, smem, 0);
+        ggml_metal_encoder_dispatch_threadgroups(enc, ((ne11 + 31)/32), ((ne01 + 63)/64), ne12*ne13, 128, 1, 1);
         }
     } else {
         auto pipeline = ggml_metal_library_get_pipeline_mul_mv(lib, op);
@@ -2542,39 +2542,39 @@ int ggml_metal_op_mul_mat_id(ggml_metal_op_t ctx, int idx) {
                 // Barrier: ensure unrotate completes before any subsequent op reads src1
                 ggml_metal_op_concurrency_reset(ctx);
             } else {
-                auto pipeline = ggml_metal_library_get_pipeline_mul_mm_id(lib, op);
+            auto pipeline = ggml_metal_library_get_pipeline_mul_mm_id(lib, op);
 
-                ggml_metal_kargs_mul_mm_id args = {
-                    /*.ne00  =*/ ne00,
-                    /*.ne02  =*/ ne02,
-                    /*.nb01  =*/ nb01,
-                    /*.nb02  =*/ nb02,
-                    /*.nb03  =*/ nb03,
-                    /*.ne11  =*/ ne11,
-                    /*.nb10  =*/ nb10,
-                    /*.nb11  =*/ nb11,
-                    /*.nb12  =*/ nb12,
-                    /*.nb13  =*/ nb13,
-                    /*.ne20  =*/ ne20,
-                    /*.ne21  =*/ ne21,
-                    /*.ne0   =*/ ne0,
-                    /*.ne1   =*/ ne1,
-                    /*.r2    =*/ r2,
-                    /*.r3    =*/ r3,
-                };
+            ggml_metal_kargs_mul_mm_id args = {
+                /*.ne00  =*/ ne00,
+                /*.ne02  =*/ ne02,
+                /*.nb01  =*/ nb01,
+                /*.nb02  =*/ nb02,
+                /*.nb03  =*/ nb03,
+                /*.ne11  =*/ ne11,
+                /*.nb10  =*/ nb10,
+                /*.nb11  =*/ nb11,
+                /*.nb12  =*/ nb12,
+                /*.nb13  =*/ nb13,
+                /*.ne20  =*/ ne20,
+                /*.ne21  =*/ ne21,
+                /*.ne0   =*/ ne0,
+                /*.ne1   =*/ ne1,
+                /*.r2    =*/ r2,
+                /*.r3    =*/ r3,
+            };
 
-                ggml_metal_encoder_set_pipeline(enc, pipeline);
-                ggml_metal_encoder_set_bytes   (enc, &args, sizeof(args), 0);
-                ggml_metal_encoder_set_buffer  (enc, bid_src0, 1);
-                ggml_metal_encoder_set_buffer  (enc, bid_src1, 2);
-                ggml_metal_encoder_set_buffer  (enc, bid_tpe,  3);
-                ggml_metal_encoder_set_buffer  (enc, bid_ids,  4);
-                ggml_metal_encoder_set_buffer  (enc, bid_dst,  5);
+            ggml_metal_encoder_set_pipeline(enc, pipeline);
+            ggml_metal_encoder_set_bytes   (enc, &args, sizeof(args), 0);
+            ggml_metal_encoder_set_buffer  (enc, bid_src0, 1);
+            ggml_metal_encoder_set_buffer  (enc, bid_src1, 2);
+            ggml_metal_encoder_set_buffer  (enc, bid_tpe,  3);
+            ggml_metal_encoder_set_buffer  (enc, bid_ids,  4);
+            ggml_metal_encoder_set_buffer  (enc, bid_dst,  5);
 
-                const size_t smem = pipeline.smem;
-                ggml_metal_encoder_set_threadgroup_memory_size(enc, smem, 0);
-                ggml_metal_encoder_dispatch_threadgroups(enc, (ne21 + 31)/32, (ne01 + 63)/64, ne02, 128, 1, 1);
-            }
+            const size_t smem = pipeline.smem;
+            ggml_metal_encoder_set_threadgroup_memory_size(enc, smem, 0);
+            ggml_metal_encoder_dispatch_threadgroups(enc, (ne21 + 31)/32, (ne01 + 63)/64, ne02, 128, 1, 1);
+        }
         }
     } else {
         auto pipeline = ggml_metal_library_get_pipeline_mul_mv_id(lib, op);
