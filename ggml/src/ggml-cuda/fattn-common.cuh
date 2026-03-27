@@ -316,34 +316,34 @@ static __device__ __forceinline__ float vec_dot_fattn_vec_KQ_turbo3_0(
         for (int k_KQ_1 = 0; k_KQ_1 < cpy_ne; ++k_KQ_1) {
             const int k_KQ = k_KQ_0 + (threadIdx.x % nthreads)*cpy_ne + k_KQ_1;
 
-            // elem0 is always even; elem0 and elem1 are always in the same block,
-            // the same qs byte (j0%4 ∈ {0,2}), and the same signs byte (j0%8 ∈ {0,2,4,6}).
-            const int elem0 = k_KQ * 2;                  // always even
-            const int ib    = elem0 / QK_TURBO3;          // shared block index
-            const int j0    = elem0 % QK_TURBO3;          // always even, 0..30
+        // elem0 is always even; elem0 and elem1 are always in the same block,
+        // the same qs byte (j0%4 ∈ {0,2}), and the same signs byte (j0%8 ∈ {0,2,4,6}).
+        const int elem0 = k_KQ * 2;                  // always even
+        const int ib    = elem0 / QK_TURBO3;          // shared block index
+        const int j0    = elem0 % QK_TURBO3;          // always even, 0..30
 
-            // Single loads for the shared block fields
-            const float     norm     = __half2float(K_turbo[ib].norm);
-            const uint8_t   qs_byte  = K_turbo[ib].qs[j0 / 4];      // covers both j0 and j0+1
-            const uint8_t   sgn_byte = K_turbo[ib].signs[j0 / 8];   // covers both j0 and j0+1
+        // Single loads for the shared block fields
+        const float     norm     = __half2float(K_turbo[ib].norm);
+        const uint8_t   qs_byte  = K_turbo[ib].qs[j0 / 4];      // covers both j0 and j0+1
+        const uint8_t   sgn_byte = K_turbo[ib].signs[j0 / 8];   // covers both j0 and j0+1
 
-            // Extract 3-bit indices for elem0 and elem1 from shared bytes
-            const int     shift  = (j0 % 4) * 2;                     // 0 or 4
-            const uint8_t idx0   = ((qs_byte >> shift)     & 0x3) | (((sgn_byte >> (j0 % 8))     & 0x1) << 2);
-            const uint8_t idx1   = ((qs_byte >> (shift+2)) & 0x3) | (((sgn_byte >> (j0 % 8 + 1)) & 0x1) << 2);
+        // Extract 3-bit indices for elem0 and elem1 from shared bytes
+        const int     shift  = (j0 % 4) * 2;                     // 0 or 4
+        const uint8_t idx0   = ((qs_byte >> shift)     & 0x3) | (((sgn_byte >> (j0 % 8))     & 0x1) << 2);
+        const uint8_t idx1   = ((qs_byte >> (shift+2)) & 0x3) | (((sgn_byte >> (j0 % 8 + 1)) & 0x1) << 2);
 
-            float2 kv;
-            kv.x = TURBO_CENTROIDS_3BIT[idx0] * norm;
-            kv.y = TURBO_CENTROIDS_3BIT[idx1] * norm;
+        float2 kv;
+        kv.x = TURBO_CENTROIDS_3BIT[idx0] * norm;
+        kv.y = TURBO_CENTROIDS_3BIT[idx1] * norm;
 
 #ifdef V_DOT2_F32_F16_AVAILABLE
             const half2 qv = ((const half2 *) Q_v)[k_KQ_0/nthreads + k_KQ_1];
-            ggml_cuda_mad(sum, make_float2(kv.x, kv.y), __half22float2(qv));
+        ggml_cuda_mad(sum, make_float2(kv.x, kv.y), __half22float2(qv));
 #else
             const float2 qv = ((const float2 *) Q_v)[k_KQ_0/nthreads + k_KQ_1];
-            sum += kv.x * qv.x + kv.y * qv.y;
+        sum += kv.x * qv.x + kv.y * qv.y;
 #endif // V_DOT2_F32_F16_AVAILABLE
-        }
+    }
     }
 
     return sum;
@@ -745,8 +745,8 @@ template <typename T, int ne>
 static __device__ __forceinline__ void dequantize_V_turbo3_0(const void * __restrict__ vx, void * __restrict__ dst, const int64_t i0) {
     const block_turbo3_0 * x = (const block_turbo3_0 *) vx;
 
-    const int64_t ib  = i0 / QK_TURBO3;
-    const int     j0  = i0 % QK_TURBO3;
+    const int64_t ib   = i0 / QK_TURBO3;
+    const int     j0   = i0 % QK_TURBO3;
     const float   norm = __half2float(x[ib].norm);
 
     static_assert(ne == 2 || ne == 4, "bad ne");
@@ -764,7 +764,7 @@ static __device__ __forceinline__ void dequantize_V_turbo3_0(const void * __rest
         const uint8_t idx3 = ((qs_byte >> 6) & 0x3) | (((sgn_byte >> (shift_s+3)) & 0x1) << 2);
 
 #ifdef FP16_AVAILABLE
-    if constexpr (std::is_same_v<T, half>) {
+        if constexpr (std::is_same_v<T, half>) {
             ((half2 *) dst)[0] = make_half2(
                 __float2half(TURBO_CENTROIDS_3BIT[idx0] * norm),
                 __float2half(TURBO_CENTROIDS_3BIT[idx1] * norm));
@@ -789,9 +789,9 @@ static __device__ __forceinline__ void dequantize_V_turbo3_0(const void * __rest
             float v0 = turbo3_dequant_element(&x[ib], j0,   norm);
             float v1 = turbo3_dequant_element(&x[ib], j0+1, norm);
             ((half2 *) dst)[0] = make_half2(__float2half(v0), __float2half(v1));
-    } else
+        } else
 #endif // FP16_AVAILABLE
-    if constexpr (std::is_same_v<T, float>) {
+        if constexpr (std::is_same_v<T, float>) {
             ((float *) dst)[0] = turbo3_dequant_element(&x[ib], j0,   norm);
             ((float *) dst)[1] = turbo3_dequant_element(&x[ib], j0+1, norm);
         } else {
