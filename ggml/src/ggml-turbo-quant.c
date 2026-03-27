@@ -307,7 +307,7 @@ void dequantize_row_turbo3_0(const block_turbo3_0 * GGML_RESTRICT x, float * GGM
     assert(k % QK_TURBO3 == 0);
     const int nb = k / QK_TURBO3;
     for (int block = 0; block < nb; block++) {
-        float norm  = GGML_FP16_TO_FP32(x[block].norm);
+        float norm = GGML_FP16_TO_FP32(x[block].norm);
         for (int j = 0; j < QK_TURBO3; j++) {
             uint8_t low2 = (x[block].qs[j/4] >> ((j%4)*2)) & 0x3;
             uint8_t hi1 = (x[block].signs[j/8] >> (j%8)) & 0x1;
