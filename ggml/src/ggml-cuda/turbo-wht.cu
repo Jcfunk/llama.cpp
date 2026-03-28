@@ -53,7 +53,7 @@ static __global__ void k_turbo_wht_f32(const float * __restrict__ src,
 
     // Apply first sign array
     if (group_size == 128) {
-        x[t] *= (direction == 0) ? TURBO_WHT_SIGNS1[t] : TURBO_WHT_SIGNS2[t];
+    x[t] *= (direction == 0) ? TURBO_WHT_SIGNS1[t] : TURBO_WHT_SIGNS2[t];
     } else if (group_size == 64) {
         x[t] *= (direction == 0) ? TURBO_WHT_SIGNS1_64[t] : TURBO_WHT_SIGNS2_64[t];
     } else {
@@ -86,7 +86,7 @@ static __global__ void k_turbo_wht_f32(const float * __restrict__ src,
     float result;
     if (group_size == 128) {
         result = x[t] * inv_sqrt *
-            ((direction == 0) ? TURBO_WHT_SIGNS2[t] : TURBO_WHT_SIGNS1[t]);
+        ((direction == 0) ? TURBO_WHT_SIGNS2[t] : TURBO_WHT_SIGNS1[t]);
     } else if (group_size == 64) {
         result = x[t] * inv_sqrt *
             ((direction == 0) ? TURBO_WHT_SIGNS2_64[t] : TURBO_WHT_SIGNS1_64[t]);
@@ -152,12 +152,12 @@ void ggml_cuda_turbo_wht(ggml_backend_cuda_context & ctx, ggml_tensor * dst) {
 
     // Process full groups
     if (n_groups > 0) {
-        dim3 blocks(n_groups);
+    dim3 blocks(n_groups);
         if (group_size == 128) {
-            dim3 threads(128);
-            if (direction == 0) {
+    dim3 threads(128);
+    if (direction == 0) {
                 k_turbo_wht_f32<0, 128><<<blocks, threads, 0, stream>>>(src_ptr, dst_ptr, scale_inv_ptr, n_groups, head_dim, groups_per_head);
-            } else {
+    } else {
                 k_turbo_wht_f32<1, 128><<<blocks, threads, 0, stream>>>(src_ptr, dst_ptr, scale_inv_ptr, n_groups, head_dim, groups_per_head);
             }
         } else if (group_size == 64) {

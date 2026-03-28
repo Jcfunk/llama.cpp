@@ -317,7 +317,7 @@ static __global__ void k_set_rows_turbo3(
 
     // ---- Step 4: Forward WHT (signs1 → butterfly → signs2, normalized) ----
     if (GROUP_SIZE == 128) {
-        x[j] *= TURBO_WHT_SIGNS1[j];
+    x[j] *= TURBO_WHT_SIGNS1[j];
     } else {
         x[j] *= TURBO_WHT_SIGNS1_64[j];
         }
