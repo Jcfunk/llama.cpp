@@ -317,10 +317,10 @@ static __global__ void k_set_rows_turbo3(
 
     // ---- Step 4: Forward WHT (signs1 → butterfly → signs2, normalized) ----
     if (GROUP_SIZE == 128) {
-    x[j] *= TURBO_WHT_SIGNS1[j];
+        x[j] *= TURBO_WHT_SIGNS1[j];
     } else {
         x[j] *= TURBO_WHT_SIGNS1_64[j];
-        }
+    }
     __syncthreads();
 
 #define WHT_STAGE_SHARED(h) \
@@ -567,10 +567,10 @@ static void set_rows_cuda_turbo3(
         const int64_t ne_total = n_full_groups * ne01 * ne02 * ne03;
         if (group_size == 128) {
             k_set_rows_turbo3<idx_t, 128><<<(int)ne_total, 128, 0, stream>>>(
-            src0_d, src1_d, (block_turbo3_0 *)dst->data,
-            ne00, ne01, ne10, ne11, ne12, ne13,
-            s01, s02, s03, s10, s11, s12,
-            nb1, nb2, nb3);
+                src0_d, src1_d, (block_turbo3_0 *)dst->data,
+                ne00, ne01, ne10, ne11, ne12, ne13,
+                s01, s02, s03, s10, s11, s12,
+                nb1, nb2, nb3);
         } else {
             k_set_rows_turbo3<idx_t, 64><<<(int)ne_total, 64, 0, stream>>>(
                 src0_d, src1_d, (block_turbo3_0 *)dst->data,

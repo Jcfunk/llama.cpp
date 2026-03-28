@@ -316,34 +316,34 @@ static __device__ __forceinline__ float vec_dot_fattn_vec_KQ_turbo3_0(
         for (int k_KQ_1 = 0; k_KQ_1 < cpy_ne; ++k_KQ_1) {
             const int k_KQ = k_KQ_0 + (threadIdx.x % nthreads)*cpy_ne + k_KQ_1;
 
-        // elem0 is always even; elem0 and elem1 are always in the same block,
-        // the same qs byte (j0%4 ∈ {0,2}), and the same signs byte (j0%8 ∈ {0,2,4,6}).
-        const int elem0 = k_KQ * 2;                  // always even
-        const int ib    = elem0 / QK_TURBO3;          // shared block index
-        const int j0    = elem0 % QK_TURBO3;          // always even, 0..30
+            // elem0 is always even; elem0 and elem1 are always in the same block,
+            // the same qs byte (j0%4 ∈ {0,2}), and the same signs byte (j0%8 ∈ {0,2,4,6}).
+            const int elem0 = k_KQ * 2;                  // always even
+            const int ib    = elem0 / QK_TURBO3;          // shared block index
+            const int j0    = elem0 % QK_TURBO3;          // always even, 0..30
 
-        // Single loads for the shared block fields
-        const float     norm     = __half2float(K_turbo[ib].norm);
-        const uint8_t   qs_byte  = K_turbo[ib].qs[j0 / 4];      // covers both j0 and j0+1
-        const uint8_t   sgn_byte = K_turbo[ib].signs[j0 / 8];   // covers both j0 and j0+1
+            // Single loads for the shared block fields
+            const float     norm     = __half2float(K_turbo[ib].norm);
+            const uint8_t   qs_byte  = K_turbo[ib].qs[j0 / 4];      // covers both j0 and j0+1
+            const uint8_t   sgn_byte = K_turbo[ib].signs[j0 / 8];   // covers both j0 and j0+1
 
-        // Extract 3-bit indices for elem0 and elem1 from shared bytes
-        const int     shift  = (j0 % 4) * 2;                     // 0 or 4
-        const uint8_t idx0   = ((qs_byte >> shift)     & 0x3) | (((sgn_byte >> (j0 % 8))     & 0x1) << 2);
-        const uint8_t idx1   = ((qs_byte >> (shift+2)) & 0x3) | (((sgn_byte >> (j0 % 8 + 1)) & 0x1) << 2);
+            // Extract 3-bit indices for elem0 and elem1 from shared bytes
+            const int     shift  = (j0 % 4) * 2;                     // 0 or 4
+            const uint8_t idx0   = ((qs_byte >> shift)     & 0x3) | (((sgn_byte >> (j0 % 8))     & 0x1) << 2);
+            const uint8_t idx1   = ((qs_byte >> (shift+2)) & 0x3) | (((sgn_byte >> (j0 % 8 + 1)) & 0x1) << 2);
 
-        float2 kv;
-        kv.x = TURBO_CENTROIDS_3BIT[idx0] * norm;
-        kv.y = TURBO_CENTROIDS_3BIT[idx1] * norm;
+            float2 kv;
+            kv.x = TURBO_CENTROIDS_3BIT[idx0] * norm;
+            kv.y = TURBO_CENTROIDS_3BIT[idx1] * norm;
 
 #ifdef V_DOT2_F32_F16_AVAILABLE
             const half2 qv = ((const half2 *) Q_v)[k_KQ_0/nthreads + k_KQ_1];
-        ggml_cuda_mad(sum, make_float2(kv.x, kv.y), __half22float2(qv));
+            ggml_cuda_mad(sum, make_float2(kv.x, kv.y), __half22float2(qv));
 #else
             const float2 qv = ((const float2 *) Q_v)[k_KQ_0/nthreads + k_KQ_1];
-        sum += kv.x * qv.x + kv.y * qv.y;
+            sum += kv.x * qv.x + kv.y * qv.y;
 #endif // V_DOT2_F32_F16_AVAILABLE
-    }
+        }
     }
 
     return sum;
