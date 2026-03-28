@@ -815,7 +815,7 @@ void dequantize_turbo3_0_t4(device const block_turbo3_0 * xb, short il, thread t
 // ----- turbo4 dequantize with per-thread block cache -----
 
 static void turbo4_dequantize_full_block(device const block_turbo4_0 * xb, thread float * cache) {
-    const float norm  = float(xb->norm);
+    const float norm = float(xb->norm);
     const float rnorm = float(xb->rnorm);
     const float qjl_scale = 1.2533141f / 128.0f * rnorm;
 
