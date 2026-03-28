@@ -1429,16 +1429,7 @@ ggml_tensor * llama_kv_cache::cpy_k(ggml_context * ctx, ggml_tensor * k_cur, ggm
     }
 
     // store the current K values into the cache
-    ggml_tensor * result = ggml_set_rows(ctx, k, k_cur, k_idxs);
-
-    // For turbo: store WHT group size in op_params so the CUDA kernel knows.
-    // With zero-padding, all groups are always full 128-element WHT groups.
-    if (k_is_turbo) {
-        int32_t wht_group = 128;  // always 128 with padding
-        memcpy(result->op_params, &wht_group, sizeof(int32_t));
-    }
-
-    return result;
+    return ggml_set_rows(ctx, k, k_cur, k_idxs);
 }
 
 ggml_tensor * llama_kv_cache::cpy_v(ggml_context * ctx, ggml_tensor * v_cur, ggml_tensor * v_idxs, int32_t il, const slot_info & sinfo) const {
@@ -1482,13 +1473,7 @@ ggml_tensor * llama_kv_cache::cpy_v(ggml_context * ctx, ggml_tensor * v_cur, ggm
             v = ggml_reshape_2d(ctx, v, n_embd_gqa, kv_size*n_stream);
         }
 
-        ggml_tensor * result = ggml_set_rows(ctx, v, v_cur, v_idxs);
-        // With zero-padding, all groups are always full 128-element WHT groups
-        if (v_is_turbo) {
-            int32_t wht_group = 128;  // always 128 with padding
-            memcpy(result->op_params, &wht_group, sizeof(int32_t));
-        }
-        return result;
+        return ggml_set_rows(ctx, v, v_cur, v_idxs);
     }
 
     if (ggml_row_size(v_cur->type, n_embd_gqa) == v_cur->nb[2]) {
