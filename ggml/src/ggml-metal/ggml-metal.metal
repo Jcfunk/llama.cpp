@@ -10544,7 +10544,7 @@ kernel void kernel_set_rows_turbo2(
 
                 float c = turbo_centroids_2bit[idx];
                 recon_norm_sq += c * c;
-    }
+            }
         }
 
         float recon_norm = sqrt(recon_norm_sq);
