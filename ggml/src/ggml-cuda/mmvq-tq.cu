@@ -140,15 +140,15 @@ static __device__ __forceinline__ uint8_t tq3_extract_index(const uint8_t * __re
 
 template <int ncols_dst>
 static __global__ void mul_mat_tq4_1s_dp4a_multi(
-        const void       * __restrict__ vx,
+        const void  * __restrict__ vx,
         const block_q8_1 * __restrict__ vy_q8,
-        float            * __restrict__ dst,
+        float       * __restrict__ dst,
         const int ncols_x,
         const int nrows_x,
         const int stride_col_y,
         const int stride_col_dst) {
 
-    const int row = blockIdx.x * MMVQ_TQ_NWARPS + threadIdx.y;
+    const int row  = blockIdx.x * MMVQ_TQ_NWARPS + threadIdx.y;
     if (row >= nrows_x) return;
 
     const int lane = threadIdx.x;
@@ -197,7 +197,7 @@ static __global__ void mul_mat_tq4_1s_dp4a_multi(
         #pragma unroll
         for (int j = 0; j < ncols_dst; j++)
             sumf[j] += __shfl_xor_sync(0xffffffff, sumf[j], offset);
-    }
+}
 
     if (lane == 0) {
         #pragma unroll
@@ -358,15 +358,15 @@ static void launch_tq3_1s_multi(
 }
 
 void ggml_cuda_mul_mat_tq(ggml_backend_cuda_context & ctx,
-                           const ggml_tensor * src0,
-                           const ggml_tensor * src1,
-                           ggml_tensor * dst) {
+                               const ggml_tensor * src0,
+                               const ggml_tensor * src1,
+                               ggml_tensor * dst) {
     GGML_ASSERT(src0->type == GGML_TYPE_TQ4_1S || src0->type == GGML_TYPE_TQ3_1S);
     GGML_ASSERT(src1->type == GGML_TYPE_F32);
     GGML_ASSERT(dst->type  == GGML_TYPE_F32);
 
-    const int ncols_x   = src0->ne[0];
-    const int nrows_x   = src0->ne[1];
+    const int ncols_x = src0->ne[0];
+    const int nrows_x = src0->ne[1];
     const int ncols_dst = src1->ne[1];
     GGML_ASSERT(ncols_x % 32 == 0);
 
@@ -386,12 +386,12 @@ void ggml_cuda_mul_mat_tq(ggml_backend_cuda_context & ctx,
         ggml_cuda_pool_alloc<block_q8_1> q8_1_buf(ctx.pool(id), n_total_blocks);
 
         // Phase 1: Pre-rotate all tokens → q8_1
-        {
+    {
             const int wpb = 4;
             const dim3 block(32, wpb);
             const dim3 grid((n_total_blocks + wpb - 1) / wpb);
             tq_prerotate_q8_1<<<grid, block, 0, stream>>>(src1_d, q8_1_buf.get(), n_total_elements);
-        }
+    }
 
         // Phase 2: dispatch based on ncols_dst
         const int stride_col_y   = ncols_x / 32;  // q8_1 blocks per column
@@ -411,7 +411,7 @@ void ggml_cuda_mul_mat_tq(ggml_backend_cuda_context & ctx,
         // Scalar half path: TQ3_1S (all vendors) + TQ4_1S on AMD (dp4a regresses on RDNA4)
         ggml_cuda_pool_alloc<half> act_buf(ctx.pool(id), n_total_elements);
 
-        {
+    {
             const int n_total_blocks = n_total_elements / 32;
             const int wpb = 4;
             const dim3 block(32, wpb);
@@ -454,8 +454,8 @@ void ggml_cuda_mul_mat_tq(ggml_backend_cuda_context & ctx,
                     case 6: LAUNCH_SCALAR(6, src0_d, act_j, dst_j); break;
                     case 7: LAUNCH_SCALAR(7, src0_d, act_j, dst_j); break;
                     case 8: LAUNCH_SCALAR(8, src0_d, act_j, dst_j); break;
-                }
-            }
+        }
+    }
         }
         #undef LAUNCH_SCALAR
     }
