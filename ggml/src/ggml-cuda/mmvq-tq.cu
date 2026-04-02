@@ -391,7 +391,7 @@ void ggml_cuda_mul_mat_tq(ggml_backend_cuda_context & ctx,
             const dim3 block(32, wpb);
             const dim3 grid((n_total_blocks + wpb - 1) / wpb);
             tq_prerotate_q8_1<<<grid, block, 0, stream>>>(src1_d, q8_1_buf.get(), n_total_elements);
-    }
+        }
 
         // Phase 2: dispatch based on ncols_dst
         const int stride_col_y   = ncols_x / 32;  // q8_1 blocks per column
@@ -406,7 +406,7 @@ void ggml_cuda_mul_mat_tq(ggml_backend_cuda_context & ctx,
             case 6: launch_tq4_1s_multi<6>(src0_d, q8_1_buf.get(), dst_d, ncols_x, nrows_x, stride_col_y, stride_col_dst, stream); break;
             case 7: launch_tq4_1s_multi<7>(src0_d, q8_1_buf.get(), dst_d, ncols_x, nrows_x, stride_col_y, stride_col_dst, stream); break;
             case 8: launch_tq4_1s_multi<8>(src0_d, q8_1_buf.get(), dst_d, ncols_x, nrows_x, stride_col_y, stride_col_dst, stream); break;
-        }
+    }
     } else {
         // Scalar half path: TQ3_1S (all vendors) + TQ4_1S on AMD (dp4a regresses on RDNA4)
         ggml_cuda_pool_alloc<half> act_buf(ctx.pool(id), n_total_elements);
@@ -417,7 +417,7 @@ void ggml_cuda_mul_mat_tq(ggml_backend_cuda_context & ctx,
             const dim3 block(32, wpb);
             const dim3 grid((n_total_blocks + wpb - 1) / wpb);
             tq_prerotate_activation<<<grid, block, 0, stream>>>(src1_d, act_buf.get(), n_total_elements);
-        }
+    }
 
         const int stride_col_y   = ncols_x;  // half elements per column
         const int stride_col_dst = nrows_x;
@@ -458,8 +458,8 @@ void ggml_cuda_mul_mat_tq(ggml_backend_cuda_context & ctx,
     }
         }
         #undef LAUNCH_SCALAR
+        }
     }
-}
 
 
 // ============================================================================
