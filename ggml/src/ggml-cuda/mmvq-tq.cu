@@ -223,7 +223,7 @@ static __global__ void mul_mat_tq3_1s_multi(
     __shared__ float s_lut[8];
     if (threadIdx.y == 0 && threadIdx.x < 8) {
         s_lut[threadIdx.x] = TQ3_CENTROIDS_WEIGHT[threadIdx.x];
-    }
+        }
     __syncthreads();
 
     const int row  = blockIdx.x * MMVQ_TQ_NWARPS + threadIdx.y;
@@ -458,8 +458,8 @@ void ggml_cuda_mul_mat_tq(ggml_backend_cuda_context & ctx,
     }
         }
         #undef LAUNCH_SCALAR
+            }
         }
-    }
 
 
 // ============================================================================
@@ -484,7 +484,7 @@ static __global__ void k_convert_tq4_1s_to_q8_0(
     for (int h = 1; h < 32; h <<= 1) {
         float o = __shfl_xor_sync(0xffffffff, val, h);
         val = (lane & h) ? (o - val) : (val + o);
-    }
+        }
     val *= 0.17677669529663688f;
     val *= TQ_WEIGHT_SIGNS[lane];
 
@@ -498,7 +498,7 @@ static __global__ void k_convert_tq4_1s_to_q8_0(
 
     dst[block_idx].qs[lane] = (int8_t)roundf(val * id);
     if (lane == 0) dst[block_idx].d = __float2half(d);
-}
+            }
 
 void ggml_cuda_convert_tq4_1s_to_q8_0(const void * src_tq4, void * dst_q8, int64_t n_elements, cudaStream_t stream) {
     GGML_ASSERT(n_elements % QK_TQ4_1S == 0);
@@ -508,7 +508,7 @@ void ggml_cuda_convert_tq4_1s_to_q8_0(const void * src_tq4, void * dst_q8, int64
     const dim3 grid((n_blocks + wpb - 1) / wpb);
     k_convert_tq4_1s_to_q8_0<<<grid, block, 0, stream>>>(
         (const block_tq4_1s *)src_tq4, (block_q8_0 *)dst_q8, n_blocks);
-}
+        }
 
 // ============================================================================
 // Large prefill: runtime TQ4_1S → q8_0 scratch + q8_0→fp16 dequant + cuBLAS
