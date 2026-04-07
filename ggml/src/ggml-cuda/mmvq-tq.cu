@@ -140,15 +140,15 @@ static __device__ __forceinline__ uint8_t tq3_extract_index(const uint8_t * __re
 
 template <int ncols_dst>
 static __global__ void mul_mat_tq4_1s_dp4a_multi(
-        const void  * __restrict__ vx,
+        const void       * __restrict__ vx,
         const block_q8_1 * __restrict__ vy_q8,
-        float       * __restrict__ dst,
+        float            * __restrict__ dst,
         const int ncols_x,
         const int nrows_x,
         const int stride_col_y,
         const int stride_col_dst) {
 
-    const int row  = blockIdx.x * MMVQ_TQ_NWARPS + threadIdx.y;
+    const int row = blockIdx.x * MMVQ_TQ_NWARPS + threadIdx.y;
     if (row >= nrows_x) return;
 
     const int lane = threadIdx.x;
@@ -184,26 +184,26 @@ static __global__ void mul_mat_tq4_1s_dp4a_multi(
                            ggml_cuda_dp4a(c0_3, a_qs[6], ggml_cuda_dp4a(c1_3, a_qs[7], 0))));
 
             sumf[j] += d_act * (fd0 * (float)s0 + fd1 * (float)s1);
-            }
         }
+    }
 
     // Apply centroid int8→float rescale + warp reduction
-            #pragma unroll
+    #pragma unroll
     for (int j = 0; j < ncols_dst; j++)
         sumf[j] *= TQ4_CENTROID_I8_RESCALE;
 
-            #pragma unroll
+    #pragma unroll
     for (int offset = 16; offset > 0; offset >>= 1) {
-            #pragma unroll
+        #pragma unroll
         for (int j = 0; j < ncols_dst; j++)
             sumf[j] += __shfl_xor_sync(0xffffffff, sumf[j], offset);
-        }
+    }
 
     if (lane == 0) {
-    #pragma unroll
+        #pragma unroll
         for (int j = 0; j < ncols_dst; j++)
             dst[j * stride_col_dst + row] = sumf[j];
-}
+    }
 }
 
 // ============================================================================
@@ -358,15 +358,15 @@ static void launch_tq3_1s_multi(
 }
 
 void ggml_cuda_mul_mat_tq(ggml_backend_cuda_context & ctx,
-                               const ggml_tensor * src0,
-                               const ggml_tensor * src1,
-                               ggml_tensor * dst) {
+                           const ggml_tensor * src0,
+                           const ggml_tensor * src1,
+                           ggml_tensor * dst) {
     GGML_ASSERT(src0->type == GGML_TYPE_TQ4_1S || src0->type == GGML_TYPE_TQ3_1S);
     GGML_ASSERT(src1->type == GGML_TYPE_F32);
     GGML_ASSERT(dst->type  == GGML_TYPE_F32);
 
-    const int ncols_x = src0->ne[0];
-    const int nrows_x = src0->ne[1];
+    const int ncols_x   = src0->ne[0];
+    const int nrows_x   = src0->ne[1];
     const int ncols_dst = src1->ne[1];
     GGML_ASSERT(ncols_x % 32 == 0);
 
@@ -438,7 +438,7 @@ void ggml_cuda_mul_mat_tq(ggml_backend_cuda_context & ctx,
                 case 6: LAUNCH_SCALAR(6, src0_d, act_buf.get(), dst_d); break;
                 case 7: LAUNCH_SCALAR(7, src0_d, act_buf.get(), dst_d); break;
                 case 8: LAUNCH_SCALAR(8, src0_d, act_buf.get(), dst_d); break;
-        }
+            }
         } else {
             // Large prefill: batch in groups of 8
             for (int j = 0; j < ncols_dst; j += 8) {
@@ -454,8 +454,8 @@ void ggml_cuda_mul_mat_tq(ggml_backend_cuda_context & ctx,
                     case 6: LAUNCH_SCALAR(6, src0_d, act_j, dst_j); break;
                     case 7: LAUNCH_SCALAR(7, src0_d, act_j, dst_j); break;
                     case 8: LAUNCH_SCALAR(8, src0_d, act_j, dst_j); break;
-        }
-    }
+                }
+            }
         }
         #undef LAUNCH_SCALAR
     }
@@ -508,7 +508,7 @@ void ggml_cuda_convert_tq4_1s_to_q8_0(const void * src_tq4, void * dst_q8, int64
     const dim3 grid((n_blocks + wpb - 1) / wpb);
     k_convert_tq4_1s_to_q8_0<<<grid, block, 0, stream>>>(
         (const block_tq4_1s *)src_tq4, (block_q8_0 *)dst_q8, n_blocks);
-        }
+}
 
 // ============================================================================
 // Large prefill: runtime TQ4_1S → q8_0 scratch + q8_0→fp16 dequant + cuBLAS
