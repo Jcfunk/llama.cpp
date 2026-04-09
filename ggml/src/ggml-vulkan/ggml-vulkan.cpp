@@ -111,6 +111,8 @@ static bool is_pow2(uint32_t x) { return x > 1 && (x & (x-1)) == 0; }
 
 #define VK_DEVICE_DESCRIPTOR_POOL_SIZE 256
 
+#define GGML_VK_MAX_NODES 8192
+
 #define VK_CHECK(err, msg)                                          \
     do {                                                            \
         vk::Result err_ = (err);                                    \
@@ -839,6 +841,7 @@ struct vk_device_struct {
     vk_pipeline pipeline_timestep_embedding_f32;
     vk_pipeline pipeline_conv_transpose_1d_f32;
     vk_pipeline pipeline_pool2d_f32;
+    vk_pipeline pipeline_turbo_wht;
     vk_pipeline pipeline_rwkv_wkv6_f32;
     vk_pipeline pipeline_rwkv_wkv7_f32;
     // [size_idx][kda] where size_idx: 0=d32, 1=d64, 2=d128
@@ -2149,11 +2152,11 @@ static void ggml_vk_create_pipeline_func(vk_device& device, vk_pipeline& pipelin
 
     // Patch SPIR-V to enable RTE rounding for FP16, avoiding the need for
     // separate shader variants compiled with -DRTE16.
-    std::vector<uint32_t> spirv;
+    std::vector<uint32_t> spv;
     if (device->float_controls_rte_fp16) {
         const uint32_t* spv_words = reinterpret_cast<const uint32_t *>(spv_data);
         size_t word_count = spv_size / sizeof(uint32_t);
-        spirv.assign(spv_words, spv_words + word_count);
+        spv.assign(spv_words, spv_words + word_count);
 
         // Find insertion points respecting SPIR-V layout order:
         //   Header(5) -> OpCapability -> OpExtension -> ... -> OpEntryPoint -> OpExecutionMode -> ...
@@ -2163,9 +2166,9 @@ static void ggml_vk_create_pipeline_func(vk_device& device, vk_pipeline& pipelin
         size_t exec_insert_pos = pos;
         uint32_t entry_point_id = 0;
 
-        while (pos < spirv.size()) {
-            uint32_t opcode = spirv[pos] & spv::OpCodeMask;
-            uint32_t len    = spirv[pos] >> spv::WordCountShift;
+        while (pos < spv.size()) {
+            uint32_t opcode = spv[pos] & spv::OpCodeMask;
+            uint32_t len    = spv[pos] >> spv::WordCountShift;
             if (len == 0) break;
 
             if (opcode == spv::OpCapability) {
@@ -3573,6 +3576,7 @@ static void ggml_vk_load_shaders(vk_device& device) {
             CREATE_FA(GGML_TYPE_Q5_1,     q5_1, FA_SCALAR, )
             CREATE_FA(GGML_TYPE_IQ4_NL, iq4_nl, FA_SCALAR, )
         }
+        CREATE_FA(GGML_TYPE_TURBO3_0, turbo3_0, FA_SCALAR, )
     } else {
         CREATE_FA(GGML_TYPE_F32, f32, FA_SCALAR, _fp32)
         CREATE_FA(GGML_TYPE_F16, f16, FA_SCALAR, _fp32)
@@ -3595,6 +3599,7 @@ static void ggml_vk_load_shaders(vk_device& device) {
             CREATE_FA(GGML_TYPE_Q5_1,     q5_1, FA_SCALAR, _fp32)
             CREATE_FA(GGML_TYPE_IQ4_NL, iq4_nl, FA_SCALAR, _fp32)
         }
+        CREATE_FA(GGML_TYPE_TURBO3_0, turbo3_0, FA_SCALAR, _fp32)
     }
 #if defined(VK_KHR_cooperative_matrix) && defined(GGML_VULKAN_COOPMAT_GLSLC_SUPPORT)
     if (device->coopmat1_fa_support) {
@@ -4383,7 +4388,10 @@ static void ggml_vk_load_shaders(vk_device& device) {
     ggml_vk_create_pipeline(device, device->pipeline_dequant[GGML_TYPE_IQ4_NL],  "dequant_iq4_nl",  dequant_iq4_nl_len,  dequant_iq4_nl_data,  "main", 2, 5 * sizeof(uint32_t), {256 * 16, 1, 1}, {}, 1);
     ggml_vk_create_pipeline(device, device->pipeline_dequant[GGML_TYPE_MXFP4],   "dequant_mxfp4",   dequant_mxfp4_len,   dequant_mxfp4_data,   "main", 2, 5 * sizeof(uint32_t), {256 * 16, 1, 1}, {}, 1);
     ggml_vk_create_pipeline(device, device->pipeline_dequant[GGML_TYPE_NVFP4],   "dequant_nvfp4",   dequant_nvfp4_len,   dequant_nvfp4_data,   "main", 2, 5 * sizeof(uint32_t), {256 * 16, 1, 1}, {}, 1);
-    ggml_vk_create_pipeline(device, device->pipeline_dequant[GGML_TYPE_TURBO3_0], "dequant_turbo3_0", dequant_turbo3_0_len, dequant_turbo3_0_data, "main", 2, 5 * sizeof(uint32_t), {256 * 16, 1, 1}, {}, 1);
+    ggml_vk_create_pipeline(device, device->pipeline_dequant[GGML_TYPE_TURBO3_0], "dequant_turbo3_0", dequant_turbo3_0_len, dequant_turbo3_0_data, "main", 2, 5 * sizeof(uint32_t), {128, 1, 1}, {}, 1);
+
+    // TurboQuant WHT
+    ggml_vk_create_pipeline(device, device->pipeline_turbo_wht, "turbo_wht", turbo_wht_len, turbo_wht_data, "main", 2, 3 * sizeof(uint32_t), {128, 1, 1}, {}, 1);
 
     // get_rows
     ggml_vk_create_pipeline(device, device->pipeline_get_rows[GGML_TYPE_F32 ], "get_rows_f32",  get_rows_f32_len,  get_rows_f32_data,  "main", 3, sizeof(vk_op_binary_push_constants), { 512, 1, 1}, {}, 1);
@@ -7488,6 +7496,7 @@ static vk_pipeline ggml_vk_get_cpy_pipeline(ggml_backend_vk_context * ctx, const
         case GGML_TYPE_Q5_1:
         case GGML_TYPE_Q8_0:
         case GGML_TYPE_IQ4_NL:
+        case GGML_TYPE_TURBO3_0:
             return ctx->device->pipeline_cpy_quant_f32[src->type];
         default:
             break;
@@ -10314,7 +10323,9 @@ static void ggml_vk_op_f32(ggml_backend_vk_context * ctx, vk_context& subctx, co
     case GGML_OP_SET_ROWS:
         {
             uint32_t ne = ggml_nelements(src0);
-            if (ggml_is_quantized(dst->type)) {
+            if (dst->type == GGML_TYPE_TURBO3_0) {
+                ne = ne / 128;
+            } else if (ggml_is_quantized(dst->type)) {
                 // quants run 32 threads each doing QUANT_K elements
                 ne = CEIL_DIV(ne, 32 * ggml_blck_size(dst->type));
             } else {
@@ -11083,6 +11094,32 @@ static void ggml_vk_set_rows(ggml_backend_vk_context * ctx, vk_context& subctx, 
         0,
         0.0f, 0.0f, 0,
     });
+}
+
+static void ggml_vk_turbo_wht(ggml_backend_vk_context * ctx, vk_context& subctx, const ggml_tensor * src0, ggml_tensor * dst) {
+    int direction, group_size;
+    memcpy(&direction, dst->op_params + 0, sizeof(int));
+    memcpy(&group_size, dst->op_params + sizeof(int), sizeof(int));
+    struct { uint32_t ne; uint32_t direction; uint32_t group_size; } pc = {
+        (uint32_t)ggml_nelements(src0), (uint32_t)direction, (uint32_t)group_size,
+    };
+    vk_pipeline pipeline = ctx->device->pipeline_turbo_wht;
+    GGML_ASSERT(pipeline != nullptr);
+    ggml_pipeline_request_descriptor_sets(ctx, pipeline, 1);
+    vk_subbuffer src_buf = ggml_vk_tensor_subbuffer(ctx, src0, false);
+    vk_subbuffer dst_buf = ggml_vk_tensor_subbuffer(ctx, dst, false);
+    // Spread workgroups across Y/Z to stay within maxComputeWorkGroupCount[0].
+    // elements[0] / group_size = wg0; each row of 512 workgroups uses one Y slice.
+    const uint32_t n_groups = pc.ne / (uint32_t)group_size;
+    std::array<uint32_t, 3> elements;
+    if (n_groups > 262144) {
+        elements = { 512 * (uint32_t)group_size, 512, CEIL_DIV(n_groups, 262144) };
+    } else if (n_groups > 512) {
+        elements = { 512 * (uint32_t)group_size, CEIL_DIV(n_groups, 512), 1 };
+    } else {
+        elements = { pc.ne, 1, 1 };
+    }
+    ggml_vk_dispatch_pipeline(ctx, subctx, pipeline, { src_buf, dst_buf }, pc, elements);
 }
 
 static void ggml_vk_silu_back(ggml_backend_vk_context * ctx, vk_context& subctx, const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
@@ -13267,6 +13304,10 @@ static bool ggml_vk_build_graph(ggml_backend_vk_context * ctx, ggml_cgraph * cgr
         ggml_vk_set_rows(ctx, compute_ctx, src0, src1, node);
 
         break;
+    case GGML_OP_TURBO_WHT:
+        ggml_vk_turbo_wht(ctx, compute_ctx, src0, node);
+
+        break;
     case GGML_OP_SILU_BACK:
         ggml_vk_silu_back(ctx, compute_ctx, src0, src1, node);
 
@@ -13720,20 +13761,6 @@ static void ggml_backend_vk_buffer_set_tensor(ggml_backend_buffer_t buffer, ggml
     ggml_vk_buffer_write(buf, vk_tensor_offset(tensor) + tensor->view_offs + offset, data, size);
 }
 
-static void ggml_backend_vk_buffer_set_tensor_2d(ggml_backend_buffer_t buffer, ggml_tensor * tensor, const void * data, size_t offset,
-                                                 size_t size, size_t n_copies, size_t stride_tensor, size_t stride_data) {
-    VK_LOG_DEBUG("ggml_backend_vk_buffer_set_tensor_2d(" << buffer << ", " << tensor << ", " << data << ", " << offset << ", " << size << ", " <<
-                 n_copies << ", " << stride_tensor << ", " << stride_data << ")");
-    ggml_backend_vk_buffer_context * buf_ctx = (ggml_backend_vk_buffer_context *)buffer->context;
-    vk_buffer buf = buf_ctx->dev_buffer;
-
-    if (size == 0) {
-        return;
-    }
-
-    ggml_vk_buffer_write_2d(buf, vk_tensor_offset(tensor) + tensor->view_offs + offset, data, stride_data, stride_tensor, size, n_copies);
-}
-
 static void ggml_backend_vk_buffer_get_tensor(ggml_backend_buffer_t buffer, const ggml_tensor * tensor, void * data, size_t offset, size_t size) {
     VK_LOG_DEBUG("ggml_backend_vk_buffer_get_tensor(" << buffer << ", " << tensor << ", " << data << ", " << offset << ", " << size << ")");
     ggml_backend_vk_buffer_context * buf_ctx = (ggml_backend_vk_buffer_context *)buffer->context;
@@ -13745,21 +13772,6 @@ static void ggml_backend_vk_buffer_get_tensor(ggml_backend_buffer_t buffer, cons
     vk_buffer buf = buf_ctx->dev_buffer;
 
     ggml_vk_buffer_read(buf, vk_tensor_offset(tensor) + tensor->view_offs + offset, data, size);
-}
-
-static void ggml_backend_vk_buffer_get_tensor_2d(ggml_backend_buffer_t buffer, const ggml_tensor * tensor, void * data, size_t offset,
-                                                 size_t size, size_t n_copies, size_t stride_tensor, size_t stride_data) {
-    VK_LOG_DEBUG("ggml_backend_vk_buffer_get_tensor_2d(" << buffer << ", " << tensor << ", " << data << ", " << offset << ", " << size << ", " <<
-                 n_copies << ", " << stride_tensor << ", " << stride_data << ")");
-    ggml_backend_vk_buffer_context * buf_ctx = (ggml_backend_vk_buffer_context *)buffer->context;
-
-    if (size == 0) {
-        return;
-    }
-
-    vk_buffer buf = buf_ctx->dev_buffer;
-
-    ggml_vk_buffer_read_2d(buf, vk_tensor_offset(tensor) + tensor->view_offs + offset, data, stride_tensor, stride_data, size, n_copies);
 }
 
 static bool ggml_backend_vk_buffer_cpy_tensor(ggml_backend_buffer_t buffer, const ggml_tensor * src, ggml_tensor * dst) {
@@ -13796,8 +13808,8 @@ static ggml_backend_buffer_i ggml_backend_vk_buffer_interface = {
     /* .memset_tensor   = */ ggml_backend_vk_buffer_memset_tensor,
     /* .set_tensor      = */ ggml_backend_vk_buffer_set_tensor,
     /* .get_tensor      = */ ggml_backend_vk_buffer_get_tensor,
-    /* .set_tensor_2d   = */ ggml_backend_vk_buffer_set_tensor_2d,
-    /* .get_tensor_2d   = */ ggml_backend_vk_buffer_get_tensor_2d,
+    /* .set_tensor_2d   = */ NULL,
+    /* .get_tensor_2d   = */ NULL,
     /* .cpy_tensor      = */ ggml_backend_vk_buffer_cpy_tensor,
     /* .clear           = */ ggml_backend_vk_buffer_clear,
     /* .reset           = */ NULL,
@@ -13953,9 +13965,8 @@ static ggml_backend_buffer_type_t ggml_backend_vk_get_default_buffer_type(ggml_b
     return &ctx->device->buffer_type;
 }
 
-static void ggml_backend_vk_set_tensor_2d_async(ggml_backend_t backend, ggml_tensor * tensor, const void * data, size_t offset,
-                                                size_t size, size_t n_copies, size_t stride_tensor, size_t stride_data) {
-    VK_LOG_DEBUG("ggml_backend_vk_set_tensor_2d_async(" << size << ", " << n_copies << ")");
+static void ggml_backend_vk_set_tensor_async(ggml_backend_t backend, ggml_tensor * tensor, const void * data, size_t offset, size_t size) {
+    VK_LOG_DEBUG("ggml_backend_vk_set_tensor_async(" << size << ")");
     ggml_backend_vk_context * ctx = (ggml_backend_vk_context *)backend->context;
     GGML_ASSERT((tensor->buffer->buft == ggml_backend_vk_get_default_buffer_type(backend) || tensor->buffer->buft == ggml_backend_vk_host_buffer_type()) && "unsupported buffer type");
 
@@ -13969,6 +13980,7 @@ static void ggml_backend_vk_set_tensor_2d_async(ggml_backend_t backend, ggml_ten
 
     if (ctx->device->async_use_transfer_queue) {
         if (ctx->transfer_ctx.expired()) {
+            // Initialize new transfer context
             cpy_ctx = ggml_vk_create_context(ctx, ctx->transfer_cmd_pool);
             ctx->transfer_ctx = cpy_ctx;
             ggml_vk_ctx_begin(ctx->device, cpy_ctx);
@@ -13983,48 +13995,25 @@ static void ggml_backend_vk_set_tensor_2d_async(ggml_backend_t backend, ggml_ten
 
     auto dst_offset = vk_tensor_offset(tensor) + tensor->view_offs + offset;
 
-    bool ret = ggml_vk_buffer_write_2d_async(cpy_ctx, buf, dst_offset, data, stride_data, stride_tensor, size, n_copies);
+    bool ret = ggml_vk_buffer_write_async(cpy_ctx, buf, dst_offset, data, size);
 
     if (!ret) {
-        const size_t staging_size = size * n_copies;
-        ggml_vk_ensure_sync_staging_buffer(ctx, staging_size);
+        ggml_vk_ensure_sync_staging_buffer(ctx, size);
         ggml_vk_sync_buffers(nullptr, cpy_ctx);
 
-        std::vector<vk::BufferCopy> slices(1);
-        if (size == stride_tensor) {
-            slices[0].srcOffset = 0;
-            slices[0].dstOffset = dst_offset;
-            slices[0].size = staging_size;
-        } else {
-            slices.resize(n_copies);
-            for (size_t i = 0; i < n_copies; i++) {
-                slices[i].srcOffset = i * size;
-                slices[i].dstOffset = dst_offset + i * stride_tensor;
-                slices[i].size = size;
-            }
-        }
+        vk::BufferCopy buffer_cpy;
+        buffer_cpy.srcOffset = 0;
+        buffer_cpy.dstOffset = dst_offset;
+        buffer_cpy.size = size;
 
-        cpy_ctx->s->buffer->buf.copyBuffer(ctx->sync_staging->buffer, buf->buffer, slices);
-
-        if (size == stride_data) {
-            deferred_memcpy(ctx->sync_staging->ptr, data, staging_size, &cpy_ctx->in_memcpys);
-        } else {
-            for (size_t i = 0; i < n_copies; i++) {
-                deferred_memcpy((uint8_t *)ctx->sync_staging->ptr + i * size, (const uint8_t *)data + i * stride_data, size, &cpy_ctx->in_memcpys);
-            }
-        }
+        cpy_ctx->s->buffer->buf.copyBuffer(ctx->sync_staging->buffer, buf->buffer, { buffer_cpy });
+        deferred_memcpy(ctx->sync_staging->ptr, data, size, &cpy_ctx->in_memcpys);
         ggml_vk_synchronize(ctx);
     }
 }
 
-static void ggml_backend_vk_set_tensor_async(ggml_backend_t backend, ggml_tensor * tensor, const void * data, size_t offset, size_t size) {
-    VK_LOG_DEBUG("ggml_backend_vk_set_tensor_async(" << size << ")");
-    ggml_backend_vk_set_tensor_2d_async(backend, tensor, data, offset, size, 1, size, size);
-}
-
-static void ggml_backend_vk_get_tensor_2d_async(ggml_backend_t backend, const ggml_tensor * tensor, void * data, size_t offset,
-                                                size_t size, size_t n_copies, size_t stride_tensor, size_t stride_data) {
-    VK_LOG_DEBUG("ggml_backend_vk_get_tensor_2d_async(" << size << ", " << n_copies << ")");
+static void ggml_backend_vk_get_tensor_async(ggml_backend_t backend, const ggml_tensor * tensor, void * data, size_t offset, size_t size) {
+    VK_LOG_DEBUG("ggml_backend_vk_get_tensor_async(" << size << ")");
     ggml_backend_vk_context * ctx = (ggml_backend_vk_context *)backend->context;
     GGML_ASSERT((tensor->buffer->buft == ggml_backend_vk_get_default_buffer_type(backend) || tensor->buffer->buft == ggml_backend_vk_host_buffer_type()) && "unsupported buffer type");
 
@@ -14039,43 +14028,22 @@ static void ggml_backend_vk_get_tensor_2d_async(ggml_backend_t backend, const gg
     vk_buffer buf = buf_ctx->dev_buffer;
 
     auto src_offset = vk_tensor_offset(tensor) + tensor->view_offs + offset;
-    bool ret = ggml_vk_buffer_read_2d_async(compute_ctx, buf, src_offset, data, stride_tensor, stride_data, size, n_copies);
+    bool ret = ggml_vk_buffer_read_async(compute_ctx, buf, src_offset, data, size);
 
+    // If that failed, copy synchronously through a staging buffer
     if (!ret) {
-        const size_t staging_size = size * n_copies;
-        ggml_vk_ensure_sync_staging_buffer(ctx, staging_size);
+        ggml_vk_ensure_sync_staging_buffer(ctx, size);
         ggml_vk_sync_buffers(nullptr, compute_ctx);
 
-        std::vector<vk::BufferCopy> slices(1);
-        if (size == stride_tensor) {
-            slices[0].srcOffset = src_offset;
-            slices[0].dstOffset = 0;
-            slices[0].size = staging_size;
-        } else {
-            slices.resize(n_copies);
-            for (size_t i = 0; i < n_copies; i++) {
-                slices[i].srcOffset = src_offset + i * stride_tensor;
-                slices[i].dstOffset = i * size;
-                slices[i].size = size;
-            }
-        }
+        vk::BufferCopy buffer_cpy;
+        buffer_cpy.srcOffset = src_offset;
+        buffer_cpy.dstOffset = 0;
+        buffer_cpy.size = size;
 
-        compute_ctx->s->buffer->buf.copyBuffer(buf->buffer, ctx->sync_staging->buffer, slices);
-
-        if (size == stride_data) {
-            deferred_memcpy(data, ctx->sync_staging->ptr, staging_size, &compute_ctx->out_memcpys);
-        } else {
-            for (size_t i = 0; i < n_copies; i++) {
-                deferred_memcpy((uint8_t *)data + i * stride_data, (const uint8_t *)ctx->sync_staging->ptr + i * size, size, &compute_ctx->out_memcpys);
-            }
-        }
+        compute_ctx->s->buffer->buf.copyBuffer(buf->buffer, ctx->sync_staging->buffer, { buffer_cpy });
+        deferred_memcpy(data, ctx->sync_staging->ptr, size, &compute_ctx->out_memcpys);
         ggml_vk_synchronize(ctx);
     }
-}
-
-static void ggml_backend_vk_get_tensor_async(ggml_backend_t backend, const ggml_tensor * tensor, void * data, size_t offset, size_t size) {
-    VK_LOG_DEBUG("ggml_backend_vk_get_tensor_async(" << size << ")");
-    ggml_backend_vk_get_tensor_2d_async(backend, tensor, data, offset, size, 1, size, size);
 }
 
 static bool ggml_backend_vk_cpy_tensor_async(ggml_backend_t backend_src, ggml_backend_t backend_dst, const ggml_tensor * src, ggml_tensor * dst) {
@@ -14682,7 +14650,6 @@ static ggml_status ggml_backend_vk_graph_compute(ggml_backend_t backend, ggml_cg
         compute_ctx = ggml_vk_get_compute_ctx(ctx);
         ctx->query_idx = 0;
         compute_ctx->s->buffer->buf.writeTimestamp(vk::PipelineStageFlagBits::eAllCommands, ctx->query_pool, ctx->query_idx++);
-        ggml_vk_sync_buffers(ctx, compute_ctx);
     }
 
     ctx->prealloc_y_last_pipeline_used = nullptr;
@@ -14919,7 +14886,6 @@ static ggml_status ggml_backend_vk_graph_compute(ggml_backend_t backend, ggml_cg
                 ctx->query_nodes[ctx->query_idx] = cgraph->nodes[i];
                 ctx->query_fusion_names[ctx->query_idx] = fusion_string;
                 compute_ctx->s->buffer->buf.writeTimestamp(vk::PipelineStageFlagBits::eAllCommands, ctx->query_pool, ctx->query_idx++);
-                ggml_vk_sync_buffers(ctx, compute_ctx);
             } else {
                 // track a fusion string and number of fused ops for the current node_idx
                 ctx->query_fusion_names[i] = fusion_string;
@@ -15301,8 +15267,8 @@ static ggml_backend_i ggml_backend_vk_interface = {
     /* .free                    = */ ggml_backend_vk_free,
     /* .set_tensor_async        = */ ggml_backend_vk_set_tensor_async,
     /* .get_tensor_async        = */ ggml_backend_vk_get_tensor_async,
-    /* .set_tensor_2d_async     = */ ggml_backend_vk_set_tensor_2d_async,
-    /* .get_tensor_2d_async     = */ ggml_backend_vk_get_tensor_2d_async,
+    /* .get_tensor_2d_async     = */ NULL,
+    /* .set_tensor_2d_async     = */ NULL,
     /* .cpy_tensor_async        = */ ggml_backend_vk_cpy_tensor_async,
     /* .synchronize             = */ ggml_backend_vk_synchronize,
     /* .graph_plan_create       = */ NULL,
@@ -15666,16 +15632,19 @@ static bool ggml_backend_vk_device_supports_op(ggml_backend_dev_t dev, const ggm
                 auto fa_kv_ok = [coopmat2](ggml_type t) {
                     switch (t) {
                     case GGML_TYPE_F32:
-                    case GGML_TYPE_F16:
-                    case GGML_TYPE_Q8_0:
+                case GGML_TYPE_F16:
+                case GGML_TYPE_Q8_0:
+                case GGML_TYPE_TURBO3_0:
+                    // supported in scalar and coopmat2 paths
+                    break;
                     case GGML_TYPE_Q5_1:
                     case GGML_TYPE_Q5_0:
-                    case GGML_TYPE_Q4_1:
+                case GGML_TYPE_Q4_1:
                     case GGML_TYPE_Q4_0:
                         return true;
                     case GGML_TYPE_Q1_0:
                         return coopmat2;
-                    default:
+                default:
                         return false;
                     }
                 };
@@ -16032,6 +16001,8 @@ static bool ggml_backend_vk_device_supports_op(ggml_backend_dev_t dev, const ggm
                     ggml_is_contiguous(op->src[1]) &&
                     ggml_is_contiguous(op));
             }
+        case GGML_OP_TURBO_WHT:
+            return op->src[0]->type == GGML_TYPE_F32 && op->src[0]->ne[0] % 128 == 0;
         default:
             return false;
     }
