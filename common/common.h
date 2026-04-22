@@ -299,11 +299,11 @@ struct common_ngram_mod;
 
 // draft-model-based speculative decoding parameters
 struct common_params_speculative_draft {
-    int32_t n_max = 16; // maximum number of tokens to draft during speculative decoding
-    int32_t n_min = 0;  // minimum number of draft tokens to use for speculative decoding
+    int32_t n_max   = 16; // maximum number of tokens to draft during speculative decoding
+    int32_t n_min   = 0; // minimum number of draft tokens to use for speculative decoding
 
-    float p_split = 0.1f;  // speculative decoding split probability
-    float p_min   = 0.75f; // minimum speculative decoding probability (greedy)
+    float   p_split = 0.1f; // speculative decoding split probability
+    float   p_min   = 0.75f; // minimum speculative decoding probability (greedy)
 
     common_params_model mparams;
 
@@ -441,12 +441,12 @@ struct common_params {
     // offload params
     std::vector<ggml_backend_dev_t> devices; // devices to use for offloading
 
-    int32_t n_gpu_layers       = -1;    // number of layers to store in VRAM, -1 is auto, <= -2 is all
-    int32_t main_gpu           = 0;     // the GPU that is used for scratch and small tensors
-    float   tensor_split[128]  = {0};   // how split tensors should be distributed across GPUs
-    bool    fit_params         = true;  // whether to fit unset model/context parameters to free device memory
+    int32_t n_gpu_layers       = -1;   // number of layers to store in VRAM, -1 is auto, <= -2 is all
+    int32_t main_gpu           = 0;    // the GPU that is used for scratch and small tensors
+    float   tensor_split[128]  = {0};  // how split tensors should be distributed across GPUs
+    bool    fit_params         = true; // whether to fit unset model/context parameters to free device memory
     bool    fit_params_print   = false; // print the estimated required memory to run the model
-    int32_t fit_params_min_ctx = 4096;  // minimum context size to set when trying to reduce memory use
+    int32_t fit_params_min_ctx = 4096; // minimum context size to set when trying to reduce memory use
 
     // margin per device in bytes for fitting parameters to free memory:
     std::vector<size_t> fit_params_target = std::vector<size_t>(llama_max_devices(), 1024 * 1024*1024);

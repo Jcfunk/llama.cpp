@@ -176,7 +176,7 @@ struct server_slot {
 
     common_sampler_ptr smpl;
 
-    llama_token sampled; // in speculative mode, this is the last accepted token
+    llama_token  sampled; // in speculative mode, this is the last accepted token
 
     // stats
     size_t n_sent_text = 0; // number of sent text character
