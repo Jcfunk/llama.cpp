@@ -606,7 +606,7 @@ static bool common_params_parse_ex(int argc, char ** argv, common_params_context
             }
         }
         common_params_handle_model(params.speculative.draft.mparams, params.hf_token, params.offline);
-        common_params_handle_model(params.vocoder.model,           params.hf_token, params.offline);
+        common_params_handle_model(params.vocoder.model,             params.hf_token, params.offline);
     }
 
     // model is required (except for server)
@@ -3483,7 +3483,7 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
         [](common_params & params, int value) {
             if (value < 0) {
                 throw std::invalid_argument("invalid value");
-        }
+            }
             for (int i = 0; i < value; ++i) {
                 static std::list<std::string> buft_overrides_draft;
                 buft_overrides_draft.push_back(llm_ffn_exps_block_regex(i));
@@ -3660,7 +3660,7 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
         [](common_params & params, int value) {
             if (value < 1 || value > 1024) {
                 throw std::invalid_argument("ngram size N must be between 1 and 1024 inclusive");
-        }
+            }
             params.speculative.ngram_map_k.size_n = value;
         }
     ).set_spec().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
@@ -3670,7 +3670,7 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
         [](common_params & params, int value) {
             if (value < 1 || value > 1024) {
                 throw std::invalid_argument("ngram size M must be between 1 and 1024 inclusive");
-        }
+            }
             params.speculative.ngram_map_k.size_m = value;
         }
     ).set_spec().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));

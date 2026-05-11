@@ -344,8 +344,8 @@ struct common_speculative_state_draft : public common_speculative_state {
         for (int i = 0; i < (int) prompt_dft.size(); ++i) {
             int cur = 0;
             while (i_start + cur < (int) prompt_cur.size() &&
-                    i       + cur < (int) prompt_dft.size() &&
-                    prompt_cur[i_start + cur] == prompt_dft[i + cur]) {
+                   i       + cur < (int) prompt_dft.size() &&
+                   prompt_cur[i_start + cur] == prompt_dft[i + cur]) {
                 cur++;
             }
 
@@ -418,7 +418,7 @@ struct common_speculative_state_draft : public common_speculative_state {
                         LOG_ERR("%s: llama_memory_seq_rm failed, reuse_n=%d, prompt_dft.size=%zu\n", __func__, reuse_n, prompt_dft.size());
                         return;
                     }
-                prompt_dft.erase(prompt_dft.begin() + reuse_n, prompt_dft.end());
+                    prompt_dft.erase(prompt_dft.begin() + reuse_n, prompt_dft.end());
                 }
             }
         }
@@ -782,7 +782,7 @@ struct common_speculative_state_ngram_mod : public common_speculative_state {
                 n_low++;
                 if (n_low >= 3) {
                     if (verbose) {
-                    LOG_WRN("%s: low acceptance streak (%d) – resetting ngram_mod\n", __func__, n_low);
+                        LOG_WRN("%s: low acceptance streak (%d) – resetting ngram_mod\n", __func__, n_low);
                     }
 
                     mod.reset();
@@ -1065,12 +1065,12 @@ common_speculative * common_speculative_init(
                 uint16_t mgram_size_value = ngram_map.size_value;
 
                 auto config_simple = common_ngram_simple_config {
-                    /* .size_ngram      = */ ngram_size_key,
-                    /* .size_mgram      = */ mgram_size_value
+                    /* .size_ngram = */ ngram_size_key,
+                    /* .size_mgram = */ mgram_size_value
                 };
                 auto state = std::make_unique<common_speculative_state_ngram_simple>(
-                    /* .type            = */ config.type,
-                    /* .state           = */ config_simple
+                    /* .type  = */ config.type,
+                    /* .state = */ config_simple
                 );
                 impls.push_back(std::move(state));
                 break;
