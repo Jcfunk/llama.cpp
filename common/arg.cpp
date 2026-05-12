@@ -97,13 +97,8 @@ common_arg & common_arg::set_env(const char * env) {
     return *this;
 }
 
-common_arg & common_arg::set_sampling() {
-    is_sampling = true;
-    return *this;
-}
-
-common_arg & common_arg::set_spec() {
-    is_spec = true;
+common_arg & common_arg::set_sparam() {
+    is_sparam = true;
     return *this;
 }
 
@@ -248,8 +243,6 @@ std::vector<std::string> common_arg::get_env() const {
 
 // Helper function to parse tensor buffer override strings
 static void parse_tensor_buffer_overrides(const std::string & value, std::vector<llama_model_tensor_buft_override> & overrides) {
-    ggml_backend_load_all();
-
     std::map<std::string, ggml_backend_buffer_type_t> buft_list;
     for (size_t i = 0; i < ggml_backend_dev_count(); ++i) {
         auto * dev = ggml_backend_dev_get(i);
@@ -428,10 +421,6 @@ static bool parse_bool_value(const std::string & value) {
     } else {
         throw std::invalid_argument("invalid boolean value");
     }
-}
-
-[[noreturn]] static void arg_removed(const std::string & msg) {
-    throw std::invalid_argument("the argument has been removed. " + msg);
 }
 
 //
@@ -665,15 +654,12 @@ static void common_params_print_usage(common_params_context & ctx_arg) {
     };
 
     std::vector<common_arg *> common_options;
-    std::vector<common_arg *> sampling_options;
-    std::vector<common_arg *> spec_options;
+    std::vector<common_arg *> sparam_options;
     std::vector<common_arg *> specific_options;
     for (auto & opt : ctx_arg.options) {
         // in case multiple LLAMA_EXAMPLE_* are set, we prioritize the LLAMA_EXAMPLE_* matching current example
-        if (opt.is_sampling) {
-            sampling_options.push_back(&opt);
-        } else if (opt.is_spec) {
-            spec_options.push_back(&opt);
+        if (opt.is_sparam) {
+            sparam_options.push_back(&opt);
         } else if (opt.in_example(ctx_arg.ex)) {
             specific_options.push_back(&opt);
         } else {
@@ -683,9 +669,7 @@ static void common_params_print_usage(common_params_context & ctx_arg) {
     printf("----- common params -----\n\n");
     print_options(common_options);
     printf("\n\n----- sampling params -----\n\n");
-    print_options(sampling_options);
-    printf("\n\n----- speculative params -----\n\n");
-    print_options(spec_options);
+    print_options(sparam_options);
     // TODO: maybe convert enum llama_example to string
     printf("\n\n----- example-specific params -----\n\n");
     print_options(specific_options);
@@ -693,15 +677,12 @@ static void common_params_print_usage(common_params_context & ctx_arg) {
 
 static void common_params_print_completion(common_params_context & ctx_arg) {
     std::vector<common_arg *> common_options;
-    std::vector<common_arg *> sampling_options;
-    std::vector<common_arg *> spec_options;
+    std::vector<common_arg *> sparam_options;
     std::vector<common_arg *> specific_options;
 
     for (auto & opt : ctx_arg.options) {
-        if (opt.is_sampling) {
-            sampling_options.push_back(&opt);
-        } else if (opt.is_spec) {
-            spec_options.push_back(&opt);
+        if (opt.is_sparam) {
+            sparam_options.push_back(&opt);
         } else if (opt.in_example(ctx_arg.ex)) {
             specific_options.push_back(&opt);
         } else {
@@ -725,8 +706,7 @@ static void common_params_print_completion(common_params_context & ctx_arg) {
     };
 
     print_options(common_options);
-    print_options(sampling_options);
-    print_options(spec_options);
+    print_options(sparam_options);
     print_options(specific_options);
     printf("\"\n\n");
 
@@ -1598,28 +1578,28 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             params.sampling.samplers = common_sampler_types_from_names(sampler_names, true);
             params.sampling.user_sampling_config |= common_params_sampling_config::COMMON_PARAMS_SAMPLING_CONFIG_SAMPLERS;
         }
-    ).set_sampling());
+    ).set_sparam());
     add_opt(common_arg(
         {"-s", "--seed"}, "SEED",
         string_format("RNG seed (default: %d, use random seed for %d)", params.sampling.seed, LLAMA_DEFAULT_SEED),
         [](common_params & params, const std::string & value) {
             params.sampling.seed = std::stoul(value);
         }
-    ).set_sampling());
+    ).set_sparam());
     add_opt(common_arg(
         {"--sampler-seq", "--sampling-seq"}, "SEQUENCE",
         string_format("simplified sequence for samplers that will be used (default: %s)", sampler_type_chars.c_str()),
         [](common_params & params, const std::string & value) {
             params.sampling.samplers = common_sampler_types_from_chars(value);
         }
-    ).set_sampling());
+    ).set_sparam());
     add_opt(common_arg(
         {"--ignore-eos"},
         "ignore end of stream token and continue generating (implies --logit-bias EOS-inf)",
         [](common_params & params) {
             params.sampling.ignore_eos = true;
         }
-    ).set_sampling());
+    ).set_sparam());
     add_opt(common_arg(
         {"--temp", "--temperature"}, "N",
         string_format("temperature (default: %.2f)", (double)params.sampling.temp),
@@ -1628,7 +1608,7 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             params.sampling.temp = std::max(params.sampling.temp, 0.0f);
             params.sampling.user_sampling_config |= common_params_sampling_config::COMMON_PARAMS_SAMPLING_CONFIG_TEMP;
         }
-    ).set_sampling());
+    ).set_sparam());
     add_opt(common_arg(
         {"--top-k"}, "N",
         string_format("top-k sampling (default: %d, 0 = disabled)", params.sampling.top_k),
@@ -1636,7 +1616,7 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             params.sampling.top_k = value;
             params.sampling.user_sampling_config |= common_params_sampling_config::COMMON_PARAMS_SAMPLING_CONFIG_TOP_K;
         }
-    ).set_sampling().set_env("LLAMA_ARG_TOP_K"));
+    ).set_sparam().set_env("LLAMA_ARG_TOP_K"));
     add_opt(common_arg(
         {"--top-p"}, "N",
         string_format("top-p sampling (default: %.2f, 1.0 = disabled)", (double)params.sampling.top_p),
@@ -1644,7 +1624,7 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             params.sampling.top_p = std::stof(value);
             params.sampling.user_sampling_config |= common_params_sampling_config::COMMON_PARAMS_SAMPLING_CONFIG_TOP_P;
         }
-    ).set_sampling());
+    ).set_sparam());
     add_opt(common_arg(
         {"--min-p"}, "N",
         string_format("min-p sampling (default: %.2f, 0.0 = disabled)", (double)params.sampling.min_p),
@@ -1652,14 +1632,14 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             params.sampling.min_p = std::stof(value);
             params.sampling.user_sampling_config |= common_params_sampling_config::COMMON_PARAMS_SAMPLING_CONFIG_MIN_P;
         }
-    ).set_sampling());
+    ).set_sparam());
     add_opt(common_arg(
         {"--top-nsigma", "--top-n-sigma"}, "N",
         string_format("top-n-sigma sampling (default: %.2f, -1.0 = disabled)", params.sampling.top_n_sigma),
         [](common_params & params, const std::string & value) {
             params.sampling.top_n_sigma = std::stof(value);
         }
-    ).set_sampling());
+    ).set_sparam());
     add_opt(common_arg(
         {"--xtc-probability"}, "N",
         string_format("xtc probability (default: %.2f, 0.0 = disabled)", (double)params.sampling.xtc_probability),
@@ -1667,7 +1647,7 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             params.sampling.xtc_probability = std::stof(value);
             params.sampling.user_sampling_config |= common_params_sampling_config::COMMON_PARAMS_SAMPLING_CONFIG_XTC_PROBABILITY;
         }
-    ).set_sampling());
+    ).set_sparam());
     add_opt(common_arg(
         {"--xtc-threshold"}, "N",
         string_format("xtc threshold (default: %.2f, 1.0 = disabled)", (double)params.sampling.xtc_threshold),
@@ -1675,14 +1655,14 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             params.sampling.xtc_threshold = std::stof(value);
             params.sampling.user_sampling_config |= common_params_sampling_config::COMMON_PARAMS_SAMPLING_CONFIG_XTC_THRESHOLD;
         }
-    ).set_sampling());
+    ).set_sparam());
     add_opt(common_arg(
         {"--typical", "--typical-p"}, "N",
         string_format("locally typical sampling, parameter p (default: %.2f, 1.0 = disabled)", (double)params.sampling.typ_p),
         [](common_params & params, const std::string & value) {
             params.sampling.typ_p = std::stof(value);
         }
-    ).set_sampling());
+    ).set_sparam());
     add_opt(common_arg(
         {"--repeat-last-n"}, "N",
         string_format("last n tokens to consider for penalize (default: %d, 0 = disabled, -1 = ctx_size)", params.sampling.penalty_last_n),
@@ -1694,7 +1674,7 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             params.sampling.n_prev = std::max(params.sampling.n_prev, params.sampling.penalty_last_n);
             params.sampling.user_sampling_config |= common_params_sampling_config::COMMON_PARAMS_SAMPLING_CONFIG_PENALTY_LAST_N;
         }
-    ).set_sampling());
+    ).set_sparam());
     add_opt(common_arg(
         {"--repeat-penalty"}, "N",
         string_format("penalize repeat sequence of tokens (default: %.2f, 1.0 = disabled)", (double)params.sampling.penalty_repeat),
@@ -1702,28 +1682,28 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             params.sampling.penalty_repeat = std::stof(value);
             params.sampling.user_sampling_config |= common_params_sampling_config::COMMON_PARAMS_SAMPLING_CONFIG_PENALTY_REPEAT;
         }
-    ).set_sampling());
+    ).set_sparam());
     add_opt(common_arg(
         {"--presence-penalty"}, "N",
         string_format("repeat alpha presence penalty (default: %.2f, 0.0 = disabled)", (double)params.sampling.penalty_present),
         [](common_params & params, const std::string & value) {
             params.sampling.penalty_present = std::stof(value);
         }
-    ).set_sampling());
+    ).set_sparam());
     add_opt(common_arg(
         {"--frequency-penalty"}, "N",
         string_format("repeat alpha frequency penalty (default: %.2f, 0.0 = disabled)", (double)params.sampling.penalty_freq),
         [](common_params & params, const std::string & value) {
             params.sampling.penalty_freq = std::stof(value);
         }
-    ).set_sampling());
+    ).set_sparam());
     add_opt(common_arg(
         {"--dry-multiplier"}, "N",
         string_format("set DRY sampling multiplier (default: %.2f, 0.0 = disabled)", (double)params.sampling.dry_multiplier),
         [](common_params & params, const std::string & value) {
             params.sampling.dry_multiplier = std::stof(value);
         }
-    ).set_sampling());
+    ).set_sparam());
     add_opt(common_arg(
         {"--dry-base"}, "N",
         string_format("set DRY sampling base value (default: %.2f)", (double)params.sampling.dry_base),
@@ -1734,14 +1714,14 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
                 params.sampling.dry_base = potential_base;
             }
         }
-    ).set_sampling());
+    ).set_sparam());
     add_opt(common_arg(
         {"--dry-allowed-length"}, "N",
         string_format("set allowed length for DRY sampling (default: %d)", params.sampling.dry_allowed_length),
         [](common_params & params, int value) {
             params.sampling.dry_allowed_length = value;
         }
-    ).set_sampling());
+    ).set_sparam());
     add_opt(common_arg(
         {"--dry-penalty-last-n"}, "N",
         string_format("set DRY penalty for the last n tokens (default: %d, 0 = disable, -1 = context size)", params.sampling.dry_penalty_last_n),
@@ -1751,7 +1731,7 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             }
             params.sampling.dry_penalty_last_n = value;
         }
-    ).set_sampling());
+    ).set_sparam());
     add_opt(common_arg(
         {"--dry-sequence-breaker"}, "STRING",
         string_format("add sequence breaker for DRY sampling, clearing out default breakers (%s) in the process; use \"none\" to not use any sequence breakers\n",
@@ -1777,7 +1757,7 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
                 params.sampling.dry_sequence_breakers.emplace_back(value);
             }
         }
-    ).set_sampling());
+    ).set_sparam());
     add_opt(common_arg(
         {"--adaptive-target"}, "N",
         string_format("adaptive-p: select tokens near this probability (valid range 0.0 "
@@ -1787,7 +1767,7 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
         [](common_params & params, const std::string & value) {
             params.sampling.adaptive_target = std::stof(value);
         }
-    ).set_sampling());
+    ).set_sparam());
     add_opt(common_arg(
         {"--adaptive-decay"}, "N",
         string_format("adaptive-p: decay rate for target adaptation over time. lower values "
@@ -1797,21 +1777,21 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
         [](common_params & params, const std::string & value) {
             params.sampling.adaptive_decay = std::stof(value);
         }
-    ).set_sampling());
+    ).set_sparam());
     add_opt(common_arg(
         {"--dynatemp-range"}, "N",
         string_format("dynamic temperature range (default: %.2f, 0.0 = disabled)", (double)params.sampling.dynatemp_range),
         [](common_params & params, const std::string & value) {
             params.sampling.dynatemp_range = std::stof(value);
         }
-    ).set_sampling());
+    ).set_sparam());
     add_opt(common_arg(
         {"--dynatemp-exp"}, "N",
         string_format("dynamic temperature exponent (default: %.2f)", (double)params.sampling.dynatemp_exponent),
         [](common_params & params, const std::string & value) {
             params.sampling.dynatemp_exponent = std::stof(value);
         }
-    ).set_sampling());
+    ).set_sparam());
     add_opt(common_arg(
         {"--mirostat"}, "N",
         string_format("use Mirostat sampling.\nTop K, Nucleus and Locally Typical samplers are ignored if used.\n"
@@ -1820,7 +1800,7 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             params.sampling.mirostat = value;
             params.sampling.user_sampling_config |= common_params_sampling_config::COMMON_PARAMS_SAMPLING_CONFIG_MIROSTAT;
         }
-    ).set_sampling());
+    ).set_sparam());
     add_opt(common_arg(
         {"--mirostat-lr"}, "N",
         string_format("Mirostat learning rate, parameter eta (default: %.2f)", (double)params.sampling.mirostat_eta),
@@ -1828,7 +1808,7 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             params.sampling.mirostat_eta = std::stof(value);
             params.sampling.user_sampling_config |= common_params_sampling_config::COMMON_PARAMS_SAMPLING_CONFIG_MIROSTAT_ETA;
         }
-    ).set_sampling());
+    ).set_sparam());
     add_opt(common_arg(
         {"--mirostat-ent"}, "N",
         string_format("Mirostat target entropy, parameter tau (default: %.2f)", (double)params.sampling.mirostat_tau),
@@ -1836,7 +1816,7 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             params.sampling.mirostat_tau = std::stof(value);
             params.sampling.user_sampling_config |= common_params_sampling_config::COMMON_PARAMS_SAMPLING_CONFIG_MIROSTAT_TAU;
         }
-    ).set_sampling());
+    ).set_sparam());
     add_opt(common_arg(
         {"-l", "--logit-bias"}, "TOKEN_ID(+/-)BIAS",
         "modifies the likelihood of token appearing in the completion,\n"
@@ -1858,28 +1838,28 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
                 throw std::invalid_argument("invalid input format");
             }
         }
-    ).set_sampling());
+    ).set_sparam());
     add_opt(common_arg(
         {"--grammar"}, "GRAMMAR",
         "BNF-like grammar to constrain generations (see samples in grammars/ dir)",
         [](common_params & params, const std::string & value) {
             params.sampling.grammar = {COMMON_GRAMMAR_TYPE_USER, value};
         }
-    ).set_sampling());
+    ).set_sparam());
     add_opt(common_arg(
         {"--grammar-file"}, "FNAME",
         "file to read grammar from",
         [](common_params & params, const std::string & value) {
             params.sampling.grammar = {COMMON_GRAMMAR_TYPE_USER, read_file(value)};
         }
-    ).set_sampling());
+    ).set_sparam());
     add_opt(common_arg(
         {"-j", "--json-schema"}, "SCHEMA",
         "JSON schema to constrain generations (https://json-schema.org/), e.g. `{}` for any JSON object\nFor schemas w/ external $refs, use --grammar + example/json_schema_to_grammar.py instead",
         [](common_params & params, const std::string & value) {
             params.sampling.grammar = {COMMON_GRAMMAR_TYPE_OUTPUT_FORMAT, json_schema_to_grammar(json::parse(value))};
         }
-    ).set_sampling());
+    ).set_sparam());
     add_opt(common_arg(
         {"-jf", "--json-schema-file"}, "FILE",
         "File containing a JSON schema to constrain generations (https://json-schema.org/), e.g. `{}` for any JSON object\nFor schemas w/ external $refs, use --grammar + example/json_schema_to_grammar.py instead",
@@ -1896,14 +1876,14 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             );
             params.sampling.grammar = {COMMON_GRAMMAR_TYPE_OUTPUT_FORMAT, json_schema_to_grammar(json::parse(schema))};
         }
-    ).set_sampling());
+    ).set_sparam());
     add_opt(common_arg(
         {"-bs", "--backend-sampling"},
         "enable backend sampling (experimental) (default: disabled)",
         [](common_params & params) {
             params.sampling.backend_sampling = true;
         }
-    ).set_sampling().set_env("LLAMA_ARG_BACKEND_SAMPLING"));
+    ).set_sparam().set_env("LLAMA_ARG_BACKEND_SAMPLING"));
     add_opt(common_arg(
         {"--pooling"}, "{none,mean,cls,last,rank}",
         "pooling type for embeddings, use model default if unspecified",
@@ -3329,7 +3309,7 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
         [](common_params & params, const std::string & value) {
             params.speculative.draft.mparams.hf_repo = value;
         }
-    ).set_spec().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}).set_env("LLAMA_ARG_SPEC_DRAFT_HF_REPO"));
+    ).set_sparam().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}).set_env("LLAMA_ARG_SPEC_DRAFT_HF_REPO"));
     add_opt(common_arg(
         {"--spec-draft-threads", "-td", "--threads-draft"}, "N",
         "number of threads to use during generation (default: same as --threads)",
@@ -3339,7 +3319,7 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
                 params.speculative.draft.cpuparams.n_threads = std::thread::hardware_concurrency();
             }
         }
-    ).set_spec().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
+    ).set_sparam().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
     add_opt(common_arg(
         {"--spec-draft-threads-batch", "-tbd", "--threads-batch-draft"}, "N",
         "number of threads to use during batch and prompt processing (default: same as --threads-draft)",
@@ -3349,7 +3329,7 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
                 params.speculative.draft.cpuparams_batch.n_threads = std::thread::hardware_concurrency();
             }
         }
-    ).set_spec().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
+    ).set_sparam().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
     add_opt(common_arg(
         {"--spec-draft-cpu-mask", "-Cd", "--cpu-mask-draft"}, "M",
         "Draft model CPU affinity mask. Complements cpu-range-draft (default: same as --cpu-mask)",
@@ -3359,7 +3339,7 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
                 throw std::invalid_argument("invalid cpumask");
             }
         }
-    ).set_spec().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
+    ).set_sparam().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
     add_opt(common_arg(
         {"--spec-draft-cpu-range", "-Crd", "--cpu-range-draft"}, "lo-hi",
         "Ranges of CPUs for affinity. Complements --cpu-mask-draft",
@@ -3369,14 +3349,14 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
                 throw std::invalid_argument("invalid range");
             }
         }
-    ).set_spec().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
+    ).set_sparam().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
     add_opt(common_arg(
         {"--spec-draft-cpu-strict", "--cpu-strict-draft"}, "<0|1>",
         "Use strict CPU placement for draft model (default: same as --cpu-strict)",
         [](common_params & params, int value) {
             params.speculative.draft.cpuparams.strict_cpu = value;
         }
-    ).set_spec().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
+    ).set_sparam().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
     add_opt(common_arg(
         {"--spec-draft-prio", "--prio-draft"}, "N",
         string_format("set draft process/thread priority : 0-normal, 1-medium, 2-high, 3-realtime (default: %d)\n", params.speculative.draft.cpuparams.priority),
@@ -3386,14 +3366,14 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             }
             params.speculative.draft.cpuparams.priority = (enum ggml_sched_priority) prio;
         }
-    ).set_spec().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
+    ).set_sparam().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
     add_opt(common_arg(
         {"--spec-draft-poll", "--poll-draft"}, "<0|1>",
         "Use polling to wait for draft model work (default: same as --poll)",
         [](common_params & params, int value) {
             params.speculative.draft.cpuparams.poll = value;
         }
-    ).set_spec().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
+    ).set_sparam().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
     add_opt(common_arg(
         {"--spec-draft-cpu-mask-batch", "-Cbd", "--cpu-mask-batch-draft"}, "M",
         "Draft model CPU affinity mask. Complements cpu-range-draft (default: same as --cpu-mask)",
@@ -3403,7 +3383,7 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
                 throw std::invalid_argument("invalid cpumask");
             }
         }
-    ).set_spec().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
+    ).set_sparam().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
     add_opt(common_arg(
         {"--spec-draft-cpu-range-batch", "-Crbd", "--cpu-range-batch-draft"}, "lo-hi",
         "Ranges of CPUs for affinity. Complements --cpu-mask-draft-batch)",
@@ -3413,14 +3393,14 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
                 throw std::invalid_argument("invalid cpumask");
             }
         }
-    ).set_spec().set_examples({LLAMA_EXAMPLE_SPECULATIVE}));
+    ).set_sparam().set_examples({LLAMA_EXAMPLE_SPECULATIVE}));
     add_opt(common_arg(
         {"--spec-draft-cpu-strict-batch", "--cpu-strict-batch-draft"}, "<0|1>",
         "Use strict CPU placement for draft model (default: --cpu-strict-draft)",
         [](common_params & params, int value) {
             params.speculative.draft.cpuparams_batch.strict_cpu = value;
         }
-    ).set_spec().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
+    ).set_sparam().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
     add_opt(common_arg(
         {"--spec-draft-prio-batch", "--prio-batch-draft"}, "N",
         string_format("set draft process/thread priority : 0-normal, 1-medium, 2-high, 3-realtime (default: %d)\n", params.speculative.draft.cpuparams_batch.priority),
@@ -3430,14 +3410,14 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             }
             params.speculative.draft.cpuparams_batch.priority = (enum ggml_sched_priority) prio;
         }
-    ).set_spec().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
+    ).set_sparam().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
     add_opt(common_arg(
         {"--spec-draft-poll-batch", "--poll-batch-draft"}, "<0|1>",
         "Use polling to wait for draft model work (default: --poll-draft)",
         [](common_params & params, int value) {
             params.speculative.draft.cpuparams_batch.poll = value;
         }
-    ).set_spec().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
+    ).set_sparam().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
     add_opt(common_arg(
         {"--spec-draft-type-k", "-ctkd", "--cache-type-k-draft"}, "TYPE",
         string_format(
@@ -3469,14 +3449,14 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
         "override tensor buffer type for draft model", [](common_params & params, const std::string & value) {
             parse_tensor_buffer_overrides(value, params.speculative.draft.tensor_buft_overrides);
         }
-    ).set_spec().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
+    ).set_sparam().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
     add_opt(common_arg(
         {"--spec-draft-cpu-moe", "-cmoed", "--cpu-moe-draft"},
         "keep all Mixture of Experts (MoE) weights in the CPU for the draft model",
         [](common_params & params) {
             params.speculative.draft.tensor_buft_overrides.push_back(llm_ffn_exps_cpu_override());
         }
-    ).set_spec().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}).set_env("LLAMA_ARG_SPEC_DRAFT_CPU_MOE"));
+    ).set_sparam().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}).set_env("LLAMA_ARG_SPEC_DRAFT_CPU_MOE"));
     add_opt(common_arg(
         {"--spec-draft-n-cpu-moe", "--spec-draft-ncmoe", "-ncmoed", "--n-cpu-moe-draft"}, "N",
         "keep the Mixture of Experts (MoE) weights of the first N layers in the CPU for the draft model",
@@ -3490,7 +3470,7 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
                 params.speculative.draft.tensor_buft_overrides.push_back({buft_overrides_draft.back().c_str(), ggml_backend_cpu_buffer_type()});
             }
         }
-    ).set_spec().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}).set_env("LLAMA_ARG_SPEC_DRAFT_N_CPU_MOE"));
+    ).set_sparam().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}).set_env("LLAMA_ARG_SPEC_DRAFT_N_CPU_MOE"));
 
     add_opt(common_arg(
         {"--spec-draft-n-max"}, "N",
@@ -3498,14 +3478,14 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
         [](common_params & params, int value) {
             params.speculative.draft.n_max = value;
         }
-    ).set_spec().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_LOOKUP, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}).set_env("LLAMA_ARG_SPEC_DRAFT_N_MAX"));
+    ).set_sparam().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_LOOKUP, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}).set_env("LLAMA_ARG_SPEC_DRAFT_N_MAX"));
     add_opt(common_arg(
         {"--spec-draft-n-min"}, "N",
         string_format("minimum number of draft tokens to use for speculative decoding (default: %d)", params.speculative.draft.n_min),
         [](common_params & params, int value) {
             params.speculative.draft.n_min = value;
         }
-    ).set_spec().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_LOOKUP, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}).set_env("LLAMA_ARG_SPEC_DRAFT_N_MIN"));
+    ).set_sparam().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_LOOKUP, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}).set_env("LLAMA_ARG_SPEC_DRAFT_N_MIN"));
 
     add_opt(common_arg(
         {"--spec-draft-p-split", "--draft-p-split"}, "P",
@@ -3513,21 +3493,21 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
         [](common_params & params, const std::string & value) {
             params.speculative.draft.p_split = std::stof(value);
         }
-    ).set_spec().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}).set_env("LLAMA_ARG_SPEC_DRAFT_P_SPLIT"));
+    ).set_sparam().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}).set_env("LLAMA_ARG_SPEC_DRAFT_P_SPLIT"));
     add_opt(common_arg(
         {"--spec-draft-p-min", "--draft-p-min"}, "P",
         string_format("minimum speculative decoding probability (greedy) (default: %.2f)", (double)params.speculative.draft.p_min),
         [](common_params & params, const std::string & value) {
             params.speculative.draft.p_min = std::stof(value);
         }
-    ).set_spec().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}).set_env("LLAMA_ARG_SPEC_DRAFT_P_MIN"));
+    ).set_sparam().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}).set_env("LLAMA_ARG_SPEC_DRAFT_P_MIN"));
     add_opt(common_arg(
         {"--spec-draft-ctx-size", "-cd", "--ctx-size-draft"}, "N",
         string_format("size of the prompt context for the draft model (default: %d, 0 = loaded from model)", params.speculative.draft.n_ctx),
         [](common_params & params, int value) {
             params.speculative.draft.n_ctx = value;
         }
-    ).set_spec().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}).set_env("LLAMA_ARG_SPEC_DRAFT_CTX_SIZE"));
+    ).set_sparam().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}).set_env("LLAMA_ARG_SPEC_DRAFT_CTX_SIZE"));
     add_opt(common_arg(
         {"--spec-draft-device", "-devd", "--device-draft"}, "<dev1,dev2,..>",
         "comma-separated list of devices to use for offloading the draft model (none = don't offload)\n"
@@ -3535,7 +3515,7 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
         [](common_params & params, const std::string & value) {
             params.speculative.draft.devices = parse_device_list(value);
         }
-    ).set_spec().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
+    ).set_sparam().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
     GGML_ASSERT(params.speculative.draft.n_gpu_layers < 0); // string_format would need to be extended for a default >= 0
     add_opt(common_arg(
         {"--spec-draft-ngl", "-ngld", "--gpu-layers-draft", "--n-gpu-layers-draft"}, "N",
@@ -3555,21 +3535,21 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
                 fprintf(stderr, "warning: consult docs/build.md for compilation instructions\n");
             }
         }
-    ).set_spec().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}).set_env("LLAMA_ARG_N_GPU_LAYERS_DRAFT"));
+    ).set_sparam().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}).set_env("LLAMA_ARG_N_GPU_LAYERS_DRAFT"));
     add_opt(common_arg(
         {"--spec-draft-model", "-md", "--model-draft"}, "FNAME",
         "draft model for speculative decoding (default: unused)",
         [](common_params & params, const std::string & value) {
             params.speculative.draft.mparams.path = value;
         }
-    ).set_spec().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}).set_env("LLAMA_ARG_SPEC_DRAFT_MODEL"));
+    ).set_sparam().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}).set_env("LLAMA_ARG_SPEC_DRAFT_MODEL"));
     add_opt(common_arg(
         {"--spec-draft-replace", "--spec-replace"}, "TARGET", "DRAFT",
         "translate the string in TARGET into DRAFT if the draft model and main model are not compatible",
         [](common_params & params, const std::string & tgt, const std::string & dft) {
             params.speculative.draft.replacements.push_back({ tgt, dft });
         }
-    ).set_spec().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
+    ).set_sparam().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
     add_opt(common_arg(
         {"--spec-type"}, "[none|ngram-cache|ngram-simple|ngram-map-k|ngram-map-k4v|ngram-mod]",
         string_format("type of speculative decoding to use when no draft model is provided (default: %s)\n",
@@ -3591,7 +3571,7 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
                 throw std::invalid_argument("unknown speculative decoding type without draft model");
             }
         }
-    ).set_spec().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}).set_env("LLAMA_ARG_SPEC_TYPE"));
+    ).set_sparam().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}).set_env("LLAMA_ARG_SPEC_TYPE"));
     add_opt(common_arg(
         {"--spec-ngram-mod-n-min"}, "N",
         string_format("minimum number of ngram tokens to use for ngram-based speculative decoding (default: %d)", params.speculative.ngram_mod.n_min),
@@ -3601,7 +3581,7 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             }
             params.speculative.ngram_mod.n_min = value;
         }
-    ).set_spec().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
+    ).set_sparam().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
     add_opt(common_arg(
         {"--spec-ngram-mod-n-max"}, "N",
         string_format("maximum number of ngram tokens to use for ngram-based speculative decoding (default: %d)", params.speculative.ngram_mod.n_max),
@@ -3611,7 +3591,7 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             }
             params.speculative.ngram_mod.n_max = value;
         }
-    ).set_spec().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
+    ).set_sparam().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
     add_opt(common_arg(
         {"--spec-ngram-mod-n-match"}, "N",
         string_format("ngram-mod lookup length (default: %d)", params.speculative.ngram_mod.n_match),
@@ -3621,7 +3601,7 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             }
             params.speculative.ngram_mod.n_match = value;
         }
-    ).set_spec().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
+    ).set_sparam().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
 
     add_opt(common_arg(
         {"--spec-ngram-simple-size-n"}, "N",
@@ -3632,7 +3612,7 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             }
             params.speculative.ngram_simple.size_n = value;
         }
-    ).set_spec().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
+    ).set_sparam().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
     add_opt(common_arg(
         {"--spec-ngram-simple-size-m"}, "N",
         string_format("ngram size M for ngram-simple speculative decoding, length of draft m-gram (default: %d)", params.speculative.ngram_simple.size_m),
@@ -3642,7 +3622,7 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             }
             params.speculative.ngram_simple.size_m = value;
         }
-    ).set_spec().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
+    ).set_sparam().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
     add_opt(common_arg(
         {"--spec-ngram-simple-min-hits"}, "N",
         string_format("minimum hits for ngram-simple speculative decoding (default: %d)", params.speculative.ngram_simple.min_hits),
@@ -3652,7 +3632,7 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             }
             params.speculative.ngram_simple.min_hits = value;
         }
-    ).set_spec().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
+    ).set_sparam().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
 
     add_opt(common_arg(
         {"--spec-ngram-map-k-size-n"}, "N",
@@ -3663,7 +3643,7 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             }
             params.speculative.ngram_map_k.size_n = value;
         }
-    ).set_spec().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
+    ).set_sparam().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
     add_opt(common_arg(
         {"--spec-ngram-map-k-size-m"}, "N",
         string_format("ngram size M for ngram-map-k speculative decoding, length of draft m-gram (default: %d)", params.speculative.ngram_map_k.size_m),
@@ -3673,7 +3653,7 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             }
             params.speculative.ngram_map_k.size_m = value;
         }
-    ).set_spec().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
+    ).set_sparam().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
     add_opt(common_arg(
         {"--spec-ngram-map-k-min-hits"}, "N",
         string_format("minimum hits for ngram-map-k speculative decoding (default: %d)", params.speculative.ngram_map_k.min_hits),
@@ -3683,7 +3663,7 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             }
             params.speculative.ngram_map_k.min_hits = value;
         }
-    ).set_spec().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
+    ).set_sparam().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
 
     add_opt(common_arg(
         {"--spec-ngram-map-k4v-size-n"}, "N",
@@ -3694,7 +3674,7 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             }
             params.speculative.ngram_map_k4v.size_n = value;
         }
-    ).set_spec().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
+    ).set_sparam().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
     add_opt(common_arg(
         {"--spec-ngram-map-k4v-size-m"}, "N",
         string_format("ngram size M for ngram-map-k4v speculative decoding, length of draft m-gram (default: %d)", params.speculative.ngram_map_k4v.size_m),
@@ -3704,7 +3684,7 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             }
             params.speculative.ngram_map_k4v.size_m = value;
         }
-    ).set_spec().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
+    ).set_sparam().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
     add_opt(common_arg(
         {"--spec-ngram-map-k4v-min-hits"}, "N",
         string_format("minimum hits for ngram-map-k4v speculative decoding (default: %d)", params.speculative.ngram_map_k4v.min_hits),
@@ -3714,47 +3694,11 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
             }
             params.speculative.ngram_map_k4v.min_hits = value;
         }
-    ).set_spec().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
+    ).set_sparam().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}));
 
     //
     // removed params
     //
-
-    add_opt(common_arg(
-        {"--draft", "--draft-n", "--draft-max"}, "N",
-        "the argument has been removed. use --spec-draft-n-max or --spec-ngram-mod-n-max",
-        [](common_params & /*params*/, int /*value*/) {
-            arg_removed("use --spec-draft-n-max or --spec-ngram-mod-n-max");
-        }
-    ).set_spec().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_LOOKUP, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}).set_env("LLAMA_ARG_DRAFT_MAX"));
-    add_opt(common_arg(
-        {"--draft-min", "--draft-n-min"}, "N",
-        "the argument has been removed. use --spec-draft-n-min or --spec-ngram-mod-n-min",
-        [](common_params & /*params*/, int /*value*/) {
-            arg_removed("use --spec-draft-n-min or --spec-ngram-mod-n-min");
-        }
-    ).set_spec().set_examples({LLAMA_EXAMPLE_SPECULATIVE, LLAMA_EXAMPLE_LOOKUP, LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_CLI}).set_env("LLAMA_ARG_DRAFT_MIN"));
-    add_opt(common_arg(
-        {"--spec-ngram-size-n"}, "N",
-        "the argument has been removed. use the respective --spec-ngram-*-size-n or --spec-ngram-mod-n-match",
-        [](common_params & /*params*/, int /*value*/) {
-            arg_removed("use the respective --spec-ngram-*-size-n");
-        }
-    ).set_spec().set_examples({LLAMA_EXAMPLE_SERVER}));
-    add_opt(common_arg(
-        {"--spec-ngram-size-m"}, "N",
-        "the argument has been removed. use the respective --spec-ngram-*-size-m",
-        [](common_params & /*params*/, int /*value*/) {
-            arg_removed("use the respective --spec-ngram-*-size-m");
-        }
-    ).set_spec().set_examples({LLAMA_EXAMPLE_SERVER}));
-    add_opt(common_arg(
-        {"--spec-ngram-min-hits"}, "N",
-        "the argument has been removed. use the respective --spec-ngram-*-min-hits",
-        [](common_params & /*params*/, int /*value*/) {
-            arg_removed("use the respective --spec-ngram-*-min-hits");
-        }
-    ).set_spec().set_examples({LLAMA_EXAMPLE_SERVER}));
 
     //
     // TTS params

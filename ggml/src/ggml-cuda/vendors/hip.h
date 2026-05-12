@@ -33,7 +33,7 @@
 #define CU_MEM_LOCATION_TYPE_DEVICE hipMemLocationTypeDevice
 #define CU_MEM_ACCESS_FLAGS_PROT_READWRITE hipMemAccessFlagsProtReadWrite
 #define CU_CHECK(fn) {hipError_t err = fn; if(err != hipSuccess) { GGML_ABORT("HipVMM Failure: %s\n", hipGetErrorString(err)); }}
-#define NCCL_CHECK(fn) {ncclResult_t err = fn; if(err != ncclSuccess) { GGML_ABORT("RCCL Failure RCCL returned: %i\n", err); }}
+
 // __shfl_sync: support both 3-arg (mask, var, srcLane) and 4-arg (mask, var, srcLane, width) calls
 // HIP ignores the mask but requires it to be 64-bit, so we cast explicitly.
 #define __SHFL_SYNC_3(mask, var, srcLane)        __shfl(var, srcLane, warpSize)
