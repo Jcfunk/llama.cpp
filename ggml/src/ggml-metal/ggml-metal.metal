@@ -11043,7 +11043,7 @@ kernel void kernel_set_rows_turbo(
     const TI      i1  = ((const device TI *) ((const device char *) src1 + i10*args.nb10 + i11*args.nb11 + i12*args.nb12))[0];
 
           device block_q * dst_row = (      device block_q *) ((      device char *) dst  +  i1*args.nb1  + i02*args.nb2  + i03*args.nb3);
-    const device float   * src_row = (const device float   *) ((const device char *) src0 + i01*args.nb01 + i02*args.nb02 + i03*args.nb03);
+    const device float * src_row = (const device float *) ((const device char *) src0 + i01*args.nb01 + i02*args.nb02 + i03*args.nb03);
 
     // Process in groups of 4 blocks (128 elements) for rotation
     const int blocks_per_group = QK_TURBO3_GROUP / QK;  // 128/32 = 4
@@ -11096,8 +11096,8 @@ kernel void kernel_set_rows_turbo(
                 // Accumulate centroid reconstruction norm for norm correction
                 float c = turbo_centroids_3bit[idx];
                 recon_norm_sq += c * c;
-            }
-        }
+    }
+}
 
         // Norm correction: store corrected norm so dequant(x) has exact original L2 norm.
         // Zero decode cost — dequant already multiplies by stored norm.
@@ -11117,7 +11117,7 @@ kernel void kernel_set_rows_turbo2(
         device const  void * src0,
         device const  void * src1,
         device       float * dst,
-        uint3                tgpig[[threadgroup_position_in_grid]],
+        uint3  tgpig [[threadgroup_position_in_grid]],
         uint                 tiitg[[thread_index_in_threadgroup]],
         uint3                tptg [[threads_per_threadgroup]]) {
     const int32_t i03 = tgpig.z;
@@ -11223,7 +11223,7 @@ kernel void kernel_set_rows_turbo4(
         for (int j = 0; j < 128; j++) {
             normalized[j] = blk_src[j] * inv_norm;
             x[j] = normalized[j];
-        }
+                    }
 
         // Step 2: WHT rotate in-place
         turbo_rotate_forward(x, turbo_wht_signs1, turbo_wht_signs2);
@@ -11258,15 +11258,15 @@ kernel void kernel_set_rows_turbo4(
 
             float c = turbo_centroids_4bit[idx];
             recon_norm_sq += c * c;
-        }
+                    }
 
         blk.rnorm = half(0.0f);  // reserved field, unused in 4-bit mode
 
         // Norm correction
         float recon_norm = sqrt(recon_norm_sq);
         blk.norm = half((recon_norm > 1e-10f) ? grp_norm / recon_norm : grp_norm);
-    }
-}
+                }
+                }
 
 template<typename T, typename TI>
 kernel void kernel_set_rows_f(
@@ -11286,7 +11286,7 @@ kernel void kernel_set_rows_f(
     const int32_t i01 = tgpig.x*tptg.y + tiitg/tptg.x;
     if (i01 >= args.ne01) {
         return;
-    }
+        }
 
     const int32_t i10 = i01;
     const TI      i1  = ((const device TI *) ((const device char *) src1 + i10*args.nb10 + i11*args.nb11 + i12*args.nb12))[0];
@@ -11297,7 +11297,7 @@ kernel void kernel_set_rows_f(
     for (int ind = tiitg%tptg.x; ind < args.nk0; ind += tptg.x) {
         dst_row[ind] = (T) src_row[ind];
     }
-}
+    }
 
 kernel void kernel_diag_f32(
         constant ggml_metal_kargs_diag & args,
