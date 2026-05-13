@@ -345,7 +345,7 @@ static __global__ void flash_attn_ext_vec(
                     }
                 } else {
                     sum = vec_dot_KQ(K + i_KQ*nb11, Q_reg[j], Q_i32[j], Q_ds[j]);
-                    sum = warp_reduce_sum<nthreads_KQ>(sum);
+                sum = warp_reduce_sum<nthreads_KQ>(sum);
                 }
 
                 if (use_logit_softcap) {
@@ -408,8 +408,8 @@ static __global__ void flash_attn_ext_vec(
                     const float kq_val = __shfl_sync(0xFFFFFFFF, KQ_reg[j], k0 + (nthreads_V == WARP_SIZE ? 0 : threadIdx.x / nthreads_V));
                     KQ_k[j] = make_half2(__float2half(kq_val), __float2half(kq_val));
                 } else {
-                    KQ_k[j] = __half2half2(KQ[j*nthreads + k]);
-                }
+                KQ_k[j] = __half2half2(KQ[j*nthreads + k]);
+            }
             }
 
             // Sparse V: skip V dequant if all attention weights for this position are negligible.
@@ -457,8 +457,8 @@ static __global__ void flash_attn_ext_vec(
                 if constexpr (V_is_turbo) {
                     KQ_k[j] = __shfl_sync(0xFFFFFFFF, KQ_reg[j], k0 + (nthreads_V == WARP_SIZE ? 0 : threadIdx.x / nthreads_V));
                 } else {
-                    KQ_k[j] = KQ[j*nthreads + k];
-                }
+                KQ_k[j] = KQ[j*nthreads + k];
+            }
             }
 
             // Sparse V: skip V dequant if all attention weights for this position are negligible.
@@ -579,19 +579,19 @@ static __global__ void flash_attn_ext_vec(
                 }
             } else {
 #pragma unroll
-                for (int i_VKQ_0 = 0; i_VKQ_0 < D/2; i_VKQ_0 += nthreads_V*V_rows_per_thread/2) {
-                    float2 tmp[V_rows_per_thread/2];
-                    dequantize_V(V + k*nb21, tmp,
-                        2*i_VKQ_0 + (nthreads_V == WARP_SIZE ? threadIdx.x : threadIdx.x % nthreads_V)*V_rows_per_thread);
+            for (int i_VKQ_0 = 0; i_VKQ_0 < D/2; i_VKQ_0 += nthreads_V*V_rows_per_thread/2) {
+                float2 tmp[V_rows_per_thread/2];
+                dequantize_V(V + k*nb21, tmp,
+                    2*i_VKQ_0 + (nthreads_V == WARP_SIZE ? threadIdx.x : threadIdx.x % nthreads_V)*V_rows_per_thread);
 #pragma unroll
-                    for (int i_VKQ_1 = 0; i_VKQ_1 < V_rows_per_thread/2; ++i_VKQ_1) {
+                for (int i_VKQ_1 = 0; i_VKQ_1 < V_rows_per_thread/2; ++i_VKQ_1) {
 #pragma unroll
-                        for (int j = 0; j < ncols; ++j) {
-                            VKQ[j][i_VKQ_0/nthreads_V + i_VKQ_1].x += tmp[i_VKQ_1].x*KQ_k[j];
-                            VKQ[j][i_VKQ_0/nthreads_V + i_VKQ_1].y += tmp[i_VKQ_1].y*KQ_k[j];
-                        }
+                    for (int j = 0; j < ncols; ++j) {
+                        VKQ[j][i_VKQ_0/nthreads_V + i_VKQ_1].x += tmp[i_VKQ_1].x*KQ_k[j];
+                        VKQ[j][i_VKQ_0/nthreads_V + i_VKQ_1].y += tmp[i_VKQ_1].y*KQ_k[j];
                     }
                 }
+            }
             }
 #endif // V_DOT2_F32_F16_AVAILABLE
         }

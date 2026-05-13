@@ -3109,7 +3109,7 @@ static thread_ret_t ggml_graph_compute_thread(void * data) {
         if (n_fused > 0) {
             node_n += n_fused;
         } else {
-        ggml_compute_forward(&params, node);
+            ggml_compute_forward(&params, node);
         }
 
         if (state->ith == 0 && cplan->abort_callback &&

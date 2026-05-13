@@ -262,7 +262,6 @@ llama_kv_cache::llama_kv_cache(
         const uint32_t n_embd_head_k = hparams.n_embd_head_k(il);
 
 
-
         const bool has_k = true;
         const bool has_v = !is_mla;
 
@@ -508,17 +507,17 @@ llama_kv_cache::llama_kv_cache(
     // head_dim % 64 == 0 (master's #21038 requirements).
     const char * ROT_K_OV = getenv("LLAMA_ATTN_ROT_K_OVERRIDE");
     if (ROT_K_OV && atoi(ROT_K_OV) != 0 && !attn_rot_disable) {
-        attn_rot_k =
-            n_embd_head_k_all > 0 &&
-            ggml_is_quantized(type_k) &&
-            hparams.n_embd_head_k() % 64 == 0;
+    attn_rot_k =
+        n_embd_head_k_all > 0 &&
+        ggml_is_quantized(type_k) &&
+        hparams.n_embd_head_k() % 64 == 0;
     }
     const char * ROT_V_OV = getenv("LLAMA_ATTN_ROT_V_OVERRIDE");
     if (ROT_V_OV && atoi(ROT_V_OV) != 0 && !attn_rot_disable) {
-        attn_rot_v =
-            n_embd_head_v_all > 0 &&
-            ggml_is_quantized(type_v) &&
-            hparams.n_embd_head_v() % 64 == 0;
+    attn_rot_v =
+        n_embd_head_v_all > 0 &&
+        ggml_is_quantized(type_v) &&
+        hparams.n_embd_head_v() % 64 == 0;
     }
 
     LLAMA_LOG_INFO("%s: attn_rot_k = %d, n_embd_head_k_all = %d\n", __func__, attn_rot_k, n_embd_head_k_all);
@@ -1391,7 +1390,7 @@ ggml_tensor * llama_kv_cache::get_k(ggml_context * ctx, int32_t il, uint32_t n_k
     if (k_is_turbo) {
         assert(n_embd_k_gqa >= hparams.n_embd_k_gqa(il));
     } else {
-        assert(n_embd_k_gqa == hparams.n_embd_k_gqa(il));
+    assert(n_embd_k_gqa == hparams.n_embd_k_gqa(il));
     }
 
     // Use padded head_dim for turbo types so the full padded data is returned
@@ -1433,8 +1432,8 @@ ggml_tensor * llama_kv_cache::get_v(ggml_context * ctx, int32_t il, uint32_t n_k
         return ggml_view_4d(ctx, v,
                 head_v_eff, hparams.n_head_kv(il), n_kv, ns,
                 ggml_row_size(v->type, head_v_eff),                      // v->nb[1]
-                ggml_row_size(v->type, n_embd_v_gqa),                    // v->nb[2]
-                ggml_row_size(v->type, n_embd_v_gqa*kv_size),            // v->nb[3]
+                ggml_row_size(v->type, n_embd_v_gqa),                   // v->nb[2]
+                ggml_row_size(v->type, n_embd_v_gqa*kv_size),           // v->nb[3]
                 ggml_row_size(v->type, n_embd_v_gqa*kv_size)*sinfo.s0);
     }
 
@@ -1442,8 +1441,8 @@ ggml_tensor * llama_kv_cache::get_v(ggml_context * ctx, int32_t il, uint32_t n_k
     return ggml_view_4d(ctx, v,
             n_kv, hparams.n_head_kv(il), head_v_eff, ns,
             ggml_row_size(v->type, kv_size*head_v_eff),              // v->nb[1]
-            ggml_row_size(v->type, kv_size),                         // v->nb[2]
-            ggml_row_size(v->type, kv_size*n_embd_v_gqa),            // v->nb[3]
+            ggml_row_size(v->type, kv_size),                        // v->nb[2]
+            ggml_row_size(v->type, kv_size*n_embd_v_gqa),           // v->nb[3]
             ggml_row_size(v->type, kv_size*n_embd_v_gqa)*sinfo.s0);
 }
 
@@ -1600,10 +1599,10 @@ ggml_tensor * llama_kv_cache::build_input_k_rot(ggml_context * ctx) const {
         // Original master behavior (largest power-of-2): set LLAMA_ATTN_ROT_K_NROT=0
         if (nrot == 0) {
             nrot = 64;
-            do {
-                nrot *= 2;
-            } while (n_embd_head_k_all % nrot == 0);
-            nrot /= 2;
+        do {
+            nrot *= 2;
+        } while (n_embd_head_k_all % nrot == 0);
+        nrot /= 2;
         }
 
         res = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, nrot, nrot);

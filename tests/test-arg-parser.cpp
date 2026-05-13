@@ -42,7 +42,7 @@ int main(void) {
 
                 // exclude spec args from this check
                 // ref: https://github.com/ggml-org/llama.cpp/pull/22397
-                const bool skip = opt.is_spec;
+                const bool skip = opt.is_sparam;
 
                 // ensure shorter argument precedes longer argument
                 if (!skip && opt.args.size() > 1) {
