@@ -463,54 +463,6 @@ void ggml_cuda_mul_mat_tq(ggml_backend_cuda_context & ctx,
 
 
 // ============================================================================
-// Load-time conversion: TQ4_1S → q8_0 (opt-in via GGML_TQ_CONVERT_Q8=1)
-// ============================================================================
-
-static __global__ void k_convert_tq4_1s_to_q8_0(
-        const block_tq4_1s * __restrict__ src,
-        block_q8_0         * __restrict__ dst,
-        const int n_blocks) {
-
-    const int block_idx = blockIdx.x * blockDim.y + threadIdx.y;
-    if (block_idx >= n_blocks) return;
-    const int lane = threadIdx.x;
-    const block_tq4_1s * blk = &src[block_idx];
-
-    const float d_scale = (lane < 16) ? __half2float(blk->d0) : __half2float(blk->d1);
-    const uint8_t idx = (blk->qs[lane / 2] >> ((lane & 1) * 4)) & 0xF;
-    float val = TQ4_CENTROIDS_WEIGHT[idx] * d_scale;
-
-    #pragma unroll
-    for (int h = 1; h < 32; h <<= 1) {
-        float o = __shfl_xor_sync(0xffffffff, val, h);
-        val = (lane & h) ? (o - val) : (val + o);
-    }
-    val *= 0.17677669529663688f;
-    val *= TQ_WEIGHT_SIGNS[lane];
-
-    float amax = fabsf(val);
-    #pragma unroll
-    for (int off = 16; off > 0; off >>= 1)
-        amax = fmaxf(amax, __shfl_xor_sync(0xffffffff, amax, off));
-
-    const float d = amax / 127.0f;
-    const float id = (d > 0.0f) ? 127.0f / amax : 0.0f;
-
-    dst[block_idx].qs[lane] = (int8_t)roundf(val * id);
-    if (lane == 0) dst[block_idx].d = __float2half(d);
-}
-
-void ggml_cuda_convert_tq4_1s_to_q8_0(const void * src_tq4, void * dst_q8, int64_t n_elements, cudaStream_t stream) {
-    GGML_ASSERT(n_elements % QK_TQ4_1S == 0);
-    const int n_blocks = n_elements / QK_TQ4_1S;
-    const int wpb = 4;
-    const dim3 block(32, wpb);
-    const dim3 grid((n_blocks + wpb - 1) / wpb);
-    k_convert_tq4_1s_to_q8_0<<<grid, block, 0, stream>>>(
-        (const block_tq4_1s *)src_tq4, (block_q8_0 *)dst_q8, n_blocks);
-}
-
-// ============================================================================
 // Large prefill: runtime TQ4_1S → q8_0 scratch + q8_0→fp16 dequant + cuBLAS
 // Gets tensor core throughput without permanent 1.7× VRAM cost.
 // ============================================================================

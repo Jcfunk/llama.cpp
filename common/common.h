@@ -319,6 +319,10 @@ struct common_params_speculative_draft {
     std::vector<ggml_backend_dev_t> devices; // devices to use for offloading
 
     std::vector<llama_model_tensor_buft_override> tensor_buft_overrides;
+
+    std::vector<std::pair<std::string, std::string>> replacements;
+
+    int32_t n_ctx = 0; // size of the prompt context for the draft model (0 = loaded from model)
 };
 
 struct common_params_speculative_ngram_mod {

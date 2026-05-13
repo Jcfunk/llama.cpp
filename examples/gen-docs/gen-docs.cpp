@@ -77,7 +77,7 @@ static void write_help(std::ostringstream & ss, const md_file & md) {
     std::vector<common_arg *> specific_options;
     for (auto & opt : ctx_arg.options) {
         // in case multiple LLAMA_EXAMPLE_* are set, we prioritize the LLAMA_EXAMPLE_* matching current example
-        if (opt.is_sparam) {
+        if (opt.is_spec) {
             sparam_options.push_back(&opt);
         } else if (opt.in_example(ctx_arg.ex)) {
             specific_options.push_back(&opt);
