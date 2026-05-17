@@ -145,3 +145,8 @@ poetry.toml
 /.windsurf/
 # emscripten
 a.out.*
+.claude
+.gitnexus
+AGENTS.md
+ARCHITECTURE.md
+CLAUDE.md
