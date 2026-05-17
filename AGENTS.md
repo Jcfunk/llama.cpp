@@ -108,3 +108,192 @@ To conserve context space, load these resources as needed:
 - [Jinja engine](common/jinja/README.md)
 - [How to add a new model](docs/development/HOWTO-add-model.md)
 - [PR template](.github/pull_request_template.md)
+
+<!-- gitnexus:start -->
+# GitNexus — Code Intelligence
+
+This project is indexed by GitNexus as **llama.cpp** (57224 symbols, 122441 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+
+> If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
+
+## Always Do
+
+- **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `gitnexus_impact({target: "symbolName", direction: "upstream"})` and report the blast radius (direct callers, affected processes, risk level) to the user.
+- **MUST run `gitnexus_detect_changes()` before committing** to verify your changes only affect expected symbols and execution flows.
+- **MUST warn the user** if impact analysis returns HIGH or CRITICAL risk before proceeding with edits.
+- When exploring unfamiliar code, use `gitnexus_query({query: "concept"})` to find execution flows instead of grepping. It returns process-grouped results ranked by relevance.
+- When you need full context on a specific symbol — callers, callees, which execution flows it participates in — use `gitnexus_context({name: "symbolName"})`.
+
+## Never Do
+
+- NEVER edit a function, class, or method without first running `gitnexus_impact` on it.
+- NEVER ignore HIGH or CRITICAL risk warnings from impact analysis.
+- NEVER rename symbols with find-and-replace — use `gitnexus_rename` which understands the call graph.
+- NEVER commit changes without running `gitnexus_detect_changes()` to check affected scope.
+
+## Resources
+
+| Resource | Use for |
+|----------|---------|
+| `gitnexus://repo/llama.cpp/context` | Codebase overview, check index freshness |
+| `gitnexus://repo/llama.cpp/clusters` | All functional areas |
+| `gitnexus://repo/llama.cpp/processes` | All execution flows |
+| `gitnexus://repo/llama.cpp/process/{name}` | Step-by-step execution trace |
+
+## CLI
+
+| Task | Read this skill file |
+|------|---------------------|
+| Understand architecture / "How does X work?" | `.claude/skills/gitnexus/gitnexus-exploring/SKILL.md` |
+| Blast radius / "What breaks if I change X?" | `.claude/skills/gitnexus/gitnexus-impact-analysis/SKILL.md` |
+| Trace bugs / "Why is X failing?" | `.claude/skills/gitnexus/gitnexus-debugging/SKILL.md` |
+| Rename / extract / split / refactor | `.claude/skills/gitnexus/gitnexus-refactoring/SKILL.md` |
+| Tools, resources, schema reference | `.claude/skills/gitnexus/gitnexus-guide/SKILL.md` |
+| Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus/gitnexus-cli/SKILL.md` |
+
+<!-- gitnexus:end -->
+
+# Agent Development Guide
+
+## Architecture at a Glance
+
+```
+include/llama.h          → Public C API (llama_model, llama_context)
+src/                     → Core library (llama.cpp, llama-context.cpp, llama-grammar.cpp, etc.)
+ggml/                    → Tensor computation library (the engine)
+  src/ggml.c/.cpp        → Core tensor ops, graph execution
+  src/ggml-backend*.cpp  → Backend abstraction + registry
+  src/ggml-{cpu,cuda,metal,sycl,vulkan,...}/ → Hardware backends (15+)
+common/                  → Shared utilities (common.cpp, sampling.cpp, jinja/)
+tools/                   → Production CLI tools (cli, server, llama-bench, perplexity, quantize, mtmd)
+examples/                → Example programs (batched, speculative, swiftui, android)
+tests/                   → Test suite (ctest-based)
+gguf-py/                 → Python GGUF library + conversion scripts
+```
+
+**Key entry points:**
+- `llama_model_load_from_file` (`src/llama.cpp`) — loads GGUF models
+- `llama_decode` (`src/llama-context.cpp`) — core inference function
+- `llama_sampler` chain (`common/sampling.cpp`) — token sampling strategies
+- `llama_grammar_*` (`src/llama-grammar.cpp`) — PEG grammar-constrained decoding
+
+**Critical design facts:**
+- **ggml is a submodule** — the tensor library lives in `ggml/` and is a separate repo (`ggml-org/ggml`)
+- **Matrix multiplication is transposed**: `C = ggml_mul_mat(ctx, A, B)` means `C^T = AB^T`, i.e. `C = BA^T`
+- **Tensors are row-major** — dimension 0 = columns, 1 = rows, 2 = matrices
+- **Backends are plugins** — discovered at runtime via `ggml_backend_reg.cpp`; multiple backends can coexist in one binary
+- **GGUF is the file format** — binary format with header KV metadata + tensor data
+
+## Build Commands
+
+### Standard build (CPU only)
+```bash
+cmake -B build
+cmake --build build --config Release -j $(nproc)
+```
+
+### With GPU backend
+```bash
+cmake -B build -DGGML_CUDA=ON          # NVIDIA
+cmake -B build -DGGML_METAL=ON         # Apple (enabled by default on macOS)
+cmake -B build -DGGML_VULKAN=ON        # Cross-platform GPU
+cmake -B build -DGGML_SYCL=ON          # Intel GPU
+cmake -B build -DGGML_HIP=ON           # AMD GPU (ROCm)
+```
+
+### Fast rebuild tips
+- Install `ccache` for faster repeated builds
+- Use Ninja: `cmake -B build -G Ninja && cmake --build build -j $(nproc)`
+- For debug builds: `cmake -B build -DCMAKE_BUILD_TYPE=Debug`
+
+## Testing
+
+### Run tests
+```bash
+cd build
+ctest -L main --output-on-failure           # all main tests
+ctest -L main -E "test-opt|test-backend-ops" --output-on-failure  # skip expensive
+ctest -L model --output-on-failure          # tests requiring a model file
+```
+
+### Run a single test
+```bash
+cd build
+ctest -R test-llama-arch --verbose          # run tests matching pattern
+ctest -N                                    # list all tests
+```
+
+### Full CI locally
+```bash
+# CPU-only
+bash ./ci/run.sh ./tmp/results ./tmp/mnt
+
+# With CUDA
+GG_BUILD_CUDA=1 bash ./ci/run.sh ./tmp/results ./tmp/mnt
+```
+
+### If you modified ggml
+```bash
+./build/bin/test-backend-ops -b CPU         # test CPU backend ops
+./build/bin/test-backend-ops -b CUDA        # test CUDA backend (if built)
+```
+
+### Server tests
+```bash
+cd tools/server/tests
+pytest                                      # requires llama-server running or auto-started
+```
+
+## Code Style
+
+- **4 spaces** for indentation, no tabs
+- **Column limit: 120** (`.clang-format`)
+- **Braces on same line** as function/class/struct
+- **`void * ptr`**, **`int & a`** — pointer/reference spacing
+- **`snake_case`** for all names
+- **`struct foo {}`** not `typedef struct foo {} foo`
+- **Basic `for` loops**, avoid templates, keep it simple — no fancy STL constructs
+- **Vertical alignment** for readability and batch editing
+- **Enum values**: `UPPER_CASE` with enum name prefix (e.g., `LLAMA_VOCAB_TYPE_SPM`)
+- **Naming pattern**: `<class>_<method>`, e.g. `llama_sampler_chain_remove()`
+- Run `clang-format` (v15+) on added code when in doubt
+
+## PR Requirements
+
+- **New model/feature**: CPU support only in initial PR; GPU backends in follow-up PRs
+- **New quantization type (`ggml_type`)**: requires perplexity comparisons, KL divergence data, and performance benchmarks vs. FP16/BF16
+- **New ggml operator**: add test cases to `test-backend-ops`
+- **Separate PRs** for each feature/fix — do not combine unrelated changes
+- **Squash-merge** format: `<module> : <commit title> (#<issue_number>)`
+- See [Modules wiki](https://github.com/ggml-org/llama.cpp/wiki/Modules) for module names
+
+## Server Development Scope
+
+If implementing server features, check `tools/server/README-dev.md` first. Key constraints:
+- **In-scope**: inference, chat completion, embeddings, OAI-compat, multimodal, memory management, Web UI features
+- **Out-of-scope**: model-specific API features, external API call loops, exposing internal model state
+- **Security**: file read/write features must be **disabled by default**
+- Server runs single-threaded for `server_context` — avoid heavy post-processing there
+- JSON parsing/formatting stays in HTTP worker threads, not in `server_slot`
+
+## Code Ownership
+
+Check `CODEOWNERS` for who maintains each area. Key areas:
+- `/src/` — @ggerganov
+- `/ggml/src/ggml.c`, `/ggml/src/ggml.cpp` — @ggerganov
+- `/ggml/src/ggml-cpu/` — @ggerganov
+- `/ggml/src/ggml-cuda/` — @ggml-org/ggml-cuda
+- `/ggml/src/ggml-metal/` — @ggml-org/ggml-metal
+- `/tools/server/` — @ggml-org/llama-server
+- `/common/` — @ggml-org/llama-common
+- `/tools/mtmd/` — @ggml-org/llama-mtmd
+- `/convert_*.py` — @CISC
+- `/ggml/src/gguf.cpp` — @JohannesGaessler, @Green-Sky
+
+## Python Tools
+
+- `convert_hf_to_gguf.py` — converts HuggingFace models to GGUF format
+- `convert_lora_to_gguf.py` — converts LoRA adapters
+- `gguf-py/` — Python library for GGUF read/write
+- Python files use `snake_case` naming
+- Lint/type-check: `ci/` has `python-lint.yml` and `python-type-check.yml` workflows
