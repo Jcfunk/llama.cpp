@@ -765,6 +765,50 @@ class Gemma4Model(Gemma3Model):
         yield from super().modify_tensors(data_torch, name, bid)
 
 
+@ModelBase.register("Gemma4AssistantForCausalLM")
+class Gemma4AssistantModel(Gemma4Model):
+    """Text-only Gemma4 assistant model (MTP drafter for Gemma4).
+
+    This model has attention_k_eq_v=true and no k_proj/v_proj tensors.
+    K is derived by slicing q_proj, V=K. K norm = Q norm.
+    """
+    model_arch = gguf.MODEL_ARCH.GEMMA4
+
+    @classmethod
+    def filter_tensors(cls, item: tuple[str, Callable[[], Tensor]]) -> tuple[str, Callable[[], Tensor]] | None:
+        name, gen = item
+        if name in ("post_projection.weight", "pre_projection.weight"):
+            return None
+        return super().filter_tensors((name, gen))
+
+    def set_gguf_parameters(self):
+        super().set_gguf_parameters()
+        # For standalone inference, all layers need their own KV cache.
+        # The shared_kv_layers=4 from HF config means the drafter shares KV
+        # with the main model during speculative decoding.
+        # We override to 0 so the model works standalone.
+        self.gguf_writer.add_shared_kv_layers(0)
+
+    def modify_tensors(self, data_torch: Tensor, name: str, bid: int | None) -> Iterable[tuple[str, Tensor]]:
+        # Gemma4Assistant has attention_k_eq_v=true with no k_proj/v_proj tensors.
+        # Derive k_proj by slicing q_proj to the first n_kv * head_dim rows.
+        if name.endswith(".self_attn.q_proj.weight"):
+            is_swa = self.hparams["layer_types"][bid] == "sliding_attention"
+            head_dim = self.hparams["head_dim"] if is_swa else self.hparams["global_head_dim"]
+            n_kv = self.hparams["num_key_value_heads"] if is_swa else self.hparams["num_global_key_value_heads"]
+            k_dim = n_kv * head_dim
+            k_data = data_torch[:k_dim, :]
+            k_gguf = self.format_tensor_name(gguf.MODEL_TENSOR.ATTN_K, bid)
+            yield (k_gguf, k_data)
+
+        # Also derive k_norm from q_norm (same head_dim, same normalization)
+        if name.endswith(".self_attn.q_norm.weight"):
+            k_norm_gguf = self.format_tensor_name(gguf.MODEL_TENSOR.ATTN_K_NORM, bid)
+            yield (k_norm_gguf, data_torch)
+
+        yield from super().modify_tensors(data_torch, name, bid)
+
+
 @ModelBase.register("Gemma4ForConditionalGeneration")
 class Gemma4VisionAudioModel(MmprojModel):
     has_audio_encoder = True
