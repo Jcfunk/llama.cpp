@@ -36,13 +36,13 @@ def split_str_to_n_bytes(split_str: str) -> int:
         n = int(split_str[:-1]) * 1000 * 1000 * 1000
     elif split_str.isnumeric():
         n = int(split_str)
-            else:
+    else:
         raise ValueError(f"Invalid split size: {split_str}, must be a number, optionally followed by K, M, or G")
 
     if n < 0:
         raise ValueError(f"Invalid split size: {split_str}, must be positive")
 
-            return n
+    return n
 
 
 def parse_args() -> argparse.Namespace:
