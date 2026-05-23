@@ -25,7 +25,7 @@ cmake -B build \
   -DGGML_CUDA_FORCE_CUBLAS=ON \
   -DGGML_CUDA_FORCE_MMQ=ON \
   -DGGML_CUDA_GRAPHS=ON \
-  -DGGML_LTO=ON \
+  -DGGML_LTO=ON 
   ```
 ----
 
