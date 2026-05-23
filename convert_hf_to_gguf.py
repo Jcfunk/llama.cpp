@@ -4,12 +4,24 @@
 from __future__ import annotations
 
 import argparse
+import ast
+import contextlib
+import json
 import logging
+import math
 import os
+import re
 import sys
+from enum import IntEnum
+from hashlib import sha256
 from pathlib import Path
+from typing import TypeVar
+
+import numpy as np
 
 import torch
+
+from transformers import AutoConfig
 
 if 'NO_LOCAL_GGUF' not in os.environ:
     sys.path.insert(1, str(Path(__file__).parent / 'gguf-py'))
@@ -4467,6 +4479,7 @@ class NemotronNanoV2VLModel(MmprojModel):
             if not name.endswith(".weight"):
                 name += ".weight"
             # Downsample position embeddings for fixed 512x512 image size
+            import torch
             import torch.nn.functional as F
             n_embd = self.hparams["hidden_size"]
             image_size = self.global_config.get("force_image_size", 512)
