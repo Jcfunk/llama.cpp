@@ -8,6 +8,28 @@
 
 [Manifesto](https://github.com/ggml-org/llama.cpp/discussions/205) / [ggml](https://github.com/ggml-org/ggml) / [ops](https://github.com/ggml-org/llama.cpp/blob/master/docs/ops.md)
 
+## This Branch is both PrismML Ternary and TurboQuant+
+- add PrismML ternary support
+https://github.com/PrismML-Eng/llama.cpp
+
+- add Lastest TurboQuant with
+https://github.com/TheTom/llama-cpp-turboquant
+
+Working CUDA build. 
+
+```bash
+cmake -B build \
+  -DGGML_CUDA=ON \
+  -DGGML_CUDA_FA_ALL_QUANTS=ON \
+  -DGGML_CUDA_FA=ON \
+  -DGGML_CUDA_FORCE_CUBLAS=ON \
+  -DGGML_CUDA_FORCE_MMQ=ON \
+  -DGGML_CUDA_GRAPHS=ON \
+  -DGGML_LTO=ON \
+  ```
+----
+
+
 LLM inference in C/C++
 
 ## Recent API changes
