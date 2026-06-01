@@ -1311,8 +1311,10 @@ void launch_fattn(
         hip_f16_alloc & operator=(const hip_f16_alloc &) = delete;
         ~hip_f16_alloc() {
             if (ptr) {
-                cudaStreamSynchronize(stream);
-                cudaFree(ptr);
+                // Cast to void: hipStreamSynchronize / hipFree are [[nodiscard]] under
+                // HIP's -Werror policy; we're in a destructor and can't propagate errors.
+                (void) cudaStreamSynchronize(stream);
+                (void) cudaFree(ptr);
             }
         }
         void alloc(size_t nelements) {
